@@ -1,107 +1,100 @@
-import pandas as pd
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+
+from src.data.loader import load_yahoo_ohlcv
+from src.strategy.momentum import momentum_strategy
+from src.backtest.engine import backtest_strategy
+from src.reporting.metrics import calculate_metrics
 
 
-def backtest_strategy(df, transaction_cost=0.001, vol_target=None, vol_window=20):
-    df = df.copy()
+def main() -> None:
+    ticker = "SPY"
+    start_date = "2010-01-01"
+    transaction_cost = 0.001
 
-    if "signal" not in df.columns:
-        raise ValueError("DataFrame must contain a 'signal' column.")
+    lookback = 200
+    threshold = 0.005
+    use_sma_filter = True
 
-    if "close" not in df.columns:
-        raise ValueError("DataFrame must contain a 'close' column.")
+    vol_target = 0.15
+    vol_window = 20
 
-    # pozycja od następnej sesji
-    df["position"] = df["signal"].shift(1).fillna(0)
+    print("Loading data...")
+    df = load_yahoo_ohlcv(ticker=ticker, start=start_date)
 
-    # dzienne zwroty rynku
-    df["market_returns"] = df["close"].pct_change().fillna(0)
+    print("Generating signals...")
+    strategy_df = momentum_strategy(
+        df,
+        lookback=lookback,
+        threshold=threshold,
+        use_sma_filter=use_sma_filter
+    )
 
-    # volatility targeting
-    if vol_target is not None:
-        df["realized_vol"] = df["market_returns"].rolling(vol_window).std() * (252 ** 0.5)
-        df["vol_scalar"] = vol_target / df["realized_vol"]
-        df["vol_scalar"] = df["vol_scalar"].clip(upper=3.0)
-        df["vol_scalar"] = df["vol_scalar"].fillna(0)
+    print("Running backtest...")
+    backtest_df, trade_log = backtest_strategy(
+        strategy_df,
+        transaction_cost=transaction_cost,
+        vol_target=vol_target,
+        vol_window=vol_window
+    )
 
-        df["scaled_position"] = df["position"] * df["vol_scalar"]
+    metrics = calculate_metrics(backtest_df["strategy_returns"])
+    metrics["Trades (closed)"] = len(trade_log)
+
+    print("\n=== Trade Log (last 5) ===")
+    if len(trade_log) > 0:
+        print(trade_log.tail(5))
     else:
-        df["scaled_position"] = df["position"]
+        print("No trades found.")
 
-    # zwroty strategii przed kosztami
-    df["strategy_returns_gross"] = df["scaled_position"] * df["market_returns"]
-
-    # koszt przy zmianie pozycji
-    df["trade"] = df["scaled_position"].diff().abs().fillna(0)
-    df["transaction_cost"] = df["trade"] * transaction_cost
-
-    # zwroty po kosztach
-    df["strategy_returns"] = df["strategy_returns_gross"] - df["transaction_cost"]
-
-    # krzywa kapitału
-    df["equity_curve"] = (1 + df["strategy_returns"]).cumprod()
-
-    # prosty trade log oparty o surową pozycję kierunkową
-    trade_log = []
-    current_position = 0
-    entry_date = None
-    entry_price = None
-
-    for date, row in df.iterrows():
-        new_position = row["position"]
-        price = row["close"]
-
-        if current_position == 0 and new_position != 0:
-            current_position = new_position
-            entry_date = date
-            entry_price = price
-
-        elif current_position != 0 and new_position != current_position:
-            exit_date = date
-            exit_price = price
-
-            if current_position == 1:
-                trade_return = (exit_price / entry_price) - 1
-            else:
-                trade_return = (entry_price / exit_price) - 1
-
-            trade_log.append({
-                "entry_date": entry_date,
-                "exit_date": exit_date,
-                "direction": int(current_position),
-                "entry_price": entry_price,
-                "exit_price": exit_price,
-                "trade_return": trade_return,
-                "holding_days": (exit_date - entry_date).days,
-            })
-
-            if new_position != 0:
-                current_position = new_position
-                entry_date = date
-                entry_price = price
-            else:
-                current_position = 0
-                entry_date = None
-                entry_price = None
-
-    if current_position != 0 and entry_date is not None:
-        exit_date = df.index[-1]
-        exit_price = df["close"].iloc[-1]
-
-        if current_position == 1:
-            trade_return = (exit_price / entry_price) - 1
+    print("\n=== Strategy Metrics ===")
+    for k, v in metrics.items():
+        if isinstance(v, float):
+            print(f"{k}: {v:.4f}")
         else:
-            trade_return = (entry_price / exit_price) - 1
+            print(f"{k}: {v}")
 
-        trade_log.append({
-            "entry_date": entry_date,
-            "exit_date": exit_date,
-            "direction": int(current_position),
-            "entry_price": entry_price,
-            "exit_price": exit_price,
-            "trade_return": trade_return,
-            "holding_days": (exit_date - entry_date).days,
-        })
+    output_dir = Path("results")
+    output_dir.mkdir(exist_ok=True)
 
-    trade_log_df = pd.DataFrame(trade_log)
+    trade_log_file = output_dir / "trade_log_spy_mom.csv"
+    trade_log.to_csv(trade_log_file, index=False)
+    print(f"\nSaved: {trade_log_file}")
 
-    return df, trade_log_df
+    backtest_df["buy_hold_returns"] = backtest_df["close"].pct_change().fillna(0)
+    backtest_df["buy_hold_equity"] = (1 + backtest_df["buy_hold_returns"]).cumprod()
+
+    equity_plot_file = output_dir / "equity_vs_buyhold.png"
+    plt.figure(figsize=(10, 6))
+    plt.plot(backtest_df.index, backtest_df["equity_curve"], label="Strategy")
+    plt.plot(backtest_df.index, backtest_df["buy_hold_equity"], label="Buy & Hold SPY")
+    plt.title(
+        f"{ticker} Momentum Strategy vs Buy-and-Hold\n"
+        f"lookback={lookback}, threshold={threshold}, "
+        f"SMA200={use_sma_filter}, vol_target={vol_target}"
+    )
+    plt.xlabel("Date")
+    plt.ylabel("Equity")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(equity_plot_file)
+    plt.close()
+    print(f"Saved: {equity_plot_file}")
+
+    print("\n=== Backtest Data (last 10 rows) ===")
+    cols_to_show = [
+        "close",
+        "signal",
+        "position",
+        "scaled_position",
+        "strategy_returns",
+        "equity_curve",
+        "buy_hold_equity",
+    ]
+    existing_cols = [col for col in cols_to_show if col in backtest_df.columns]
+    print(backtest_df[existing_cols].tail(10))
+
+
+if __name__ == "__main__":
+    main()

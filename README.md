@@ -181,3 +181,9 @@ Initial testing suggests the strongest configuration was approximately:
 
 - lookback = 200
 - threshold = 0.005
+
+## Strategy vs Benchmark
+
+The chart below compares the strategy equity curve against a simple buy-and-hold benchmark on SPY.
+
+![Strategy vs Buy-and-Hold](results/equity_vs_buyhold.png)
