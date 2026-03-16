@@ -7,12 +7,16 @@ from src.reporting.trades import build_trade_log
 from src.reporting.sweep import run_momentum_sweep
 
 def main() -> None:
-    df = load_yahoo_ohlcv("SPY", start="2015-01-01")
+    df = load_yahoo_ohlcv("SPY", start="2010-01-01")
+    split_date = "2019-01-01"
 
-    sig = momentum_signal(df["close"], lookback=20, threshold=0.0)
+    train = df[df.index < split_date]
+    test = df[df.index >= split_date]
+
+    sig = momentum_signal(test["close"], lookback=200, threshold=0.02)
 
     bt = SimpleBacktester(
-        df,
+        test,
         BacktestConfig(fee_bps=1.0, slippage_bps=1.0, initial_cash=10_000.0)
     )
 
@@ -52,15 +56,21 @@ def main() -> None:
     cfg = BacktestConfig(fee_bps=1.0, slippage_bps=1.0, initial_cash=10_000.0)
     lookbacks = [5, 10, 20, 50, 100, 200]
 
-    sweep = run_momentum_sweep(df, lookbacks=lookbacks, cfg=cfg, threshold=0.01)
+    thresholds = [0.005, 0.01, 0.02]
 
-    cols = ["Total Return", "CAGR", "Sharpe", "Max Drawdown", "Trades", "Trades (closed)"]
-
-    print(
-        sweep[cols]
-        .sort_values(["Sharpe"], ascending=False)
-        .round(4)
+    sweep = run_momentum_sweep(
+        train,
+        lookbacks=lookbacks,
+        thresholds=thresholds,
+        cfg=cfg
     )
+
+    cols = ["lookback", "threshold", "Total Return", "CAGR", "Sharpe", "Max Drawdown", "Trades", "Trades (closed)"]
+
+    top = sweep[cols].sort_values(["Sharpe"], ascending=False).round(4)
+
+    print("\n=== Top 5 Parameter Sets ===")
+    print(top.head(5))
 
     sweep.to_csv("sweep_results.csv")
     print("Saved: sweep_results.csv")

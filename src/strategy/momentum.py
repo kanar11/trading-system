@@ -1,10 +1,15 @@
 import pandas as pd
 
-def momentum_signal(close: pd.Series, lookback:int = 20, threshold:float = 0.00) -> pd.Series:
-    if lookback <= 0:
-        raise ValueError("lookback must be greater than zero")
+def momentum(df, lookback=20, threshold=0.01):
+    df = df.copy()
 
-    rolling_ret = close.pct_change(lookback)
+    df["returns"] = df["close"].pct_change(lookback)
 
-    signal = (rolling_ret > threshold).astype(int) - (rolling_ret < -threshold).astype(int)
-    return signal.fillna(0).astype(int)
+    df["signal"] = 0
+    df.loc[df["returns"] > threshold, "signal"] = 1
+    df.loc[df["returns"] < -threshold, "signal"] = -1
+
+    return df
+
+
+momentum_strategy = momentum
