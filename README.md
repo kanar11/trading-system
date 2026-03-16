@@ -160,3 +160,24 @@ stronger validation and robustness checks
 ## Author
 
 Built as a personal quant / systematic trading research project.
+
+## Parameter Sweep Results
+
+The momentum strategy was evaluated across multiple parameter combinations.
+
+Tested parameters:
+- lookback: 5, 10, 20, 50, 100, 200
+- threshold: 0.0, 0.005, 0.01, 0.02
+
+Results were ranked by Sharpe Ratio.
+
+### Sharpe Ratio Heatmap
+
+![Momentum Strategy Parameter Heatmap](results/parameter_heatmap.png)
+
+The heatmap shows the Sharpe Ratio across parameter combinations.
+
+Initial testing suggests the strongest configuration was approximately:
+
+- lookback = 200
+- threshold = 0.005
