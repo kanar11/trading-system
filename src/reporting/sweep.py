@@ -1,34 +1,61 @@
+from pathlib import Path
 import pandas as pd
+from src.data.loader import load_yahoo_ohlcv
+from src.strategy.momentum import momentum_strategy
+from src.backtest.engine import backtest_strategy
+from src.reporting.metrics import calculate_metrics
 
-from src.strategy.momentum import momentum_signal
-from src.backtest.engine import SimpleBacktester, BacktestConfig
-from src.reporting.metrics import compute_metrics
-from src.reporting.trades import build_trade_log
 
+def run_sweep(ticker="SPY", start_date="2015-01-01", transaction_cost=0.001):
+    lookbacks = [5, 10, 20, 50, 100, 200]
+    thresholds = [0.0, 0.005, 0.01, 0.02]
 
-def run_momentum_sweep(
-    df: pd.DataFrame,
-    lookbacks: list[int],
-    thresholds: list[float],
-    cfg: BacktestConfig,
-) -> pd.DataFrame:
-    rows = []
+    print("Loading data...")
+    df = load_yahoo_ohlcv(ticker=ticker, start=start_date)
+
+    results = []
 
     for lookback in lookbacks:
         for threshold in thresholds:
-            sig = momentum_signal(df["close"], lookback=lookback, threshold=threshold)
+            print(f"Testing lookback={lookback}, threshold={threshold}")
 
-            bt = SimpleBacktester(df, cfg)
-            res = bt.run(sig)
+            strategy_df = momentum_strategy(
+                df.copy(),
+                lookback=lookback,
+                threshold=threshold,
+                use_sma_filter=True
+            )
 
-            metrics = compute_metrics(res)
-            trades = build_trade_log(res)
+            backtest_df, trade_log = backtest_strategy(
+                strategy_df,
+                transaction_cost=transaction_cost,
+                vol_target=0.15,
+                vol_window=20
+            )
 
-            metrics["lookback"] = lookback
-            metrics["threshold"] = threshold
-            metrics["Trades (closed)"] = len(trades)
+            metrics = calculate_metrics(backtest_df["strategy_returns"])
 
-            rows.append(metrics)
+            results.append({
+                "lookback": lookback,
+                "threshold": threshold,
+                "total_return": metrics["Total Return"],
+                "cagr": metrics["CAGR"],
+                "sharpe": metrics["Sharpe Ratio"],
+                "max_drawdown": metrics["Max Drawdown"],
+                "num_trades": len(trade_log),
+            })
 
-    out = pd.DataFrame(rows).sort_values(["lookback", "threshold"]).reset_index(drop=True)
-    return out
+    results_df = pd.DataFrame(results).sort_values(
+        by=["sharpe", "total_return"], ascending=False
+    ).reset_index(drop=True)
+
+    output_dir = Path("results")
+    output_dir.mkdir(exist_ok=True)
+    results_df.to_csv(output_dir / "sweep_results.csv", index=False)
+
+    print("\n=== Top 10 Results ===")
+    print(results_df.head(10))
+
+
+if __name__ == "__main__":
+    run_sweep()
