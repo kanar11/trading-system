@@ -4,7 +4,7 @@ import yfinance as yf
 REQUIRED_COLS = ["open" , "high" , "low" , "close" , "volume"]
 
 def load_yahoo_ohlcv(ticker: str, start="2015-01-01"):
-    df = yf.download(ticker, start=start, progress=False)
+    df = yf.download(ticker, start=start, progress=False, auto_adjust=True)
 
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = [c[0] for c in df.columns]
