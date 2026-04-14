@@ -19,3 +19,7 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+# Allow result artifacts
+!results/
+!results/*.png
+!results/*.csv
