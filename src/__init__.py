@@ -1,0 +1,1 @@
+"""Systematic trading research backtester."""
