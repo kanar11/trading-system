@@ -2,8 +2,15 @@
 
 Loads data, generates signals, runs a cost-aware backtest with optional
 risk management, and exports results.
+
+Usage:
+    python main.py
+    python main.py --ticker AAPL --start 2015-01-01
+    python main.py --lookback 100 --threshold 0.01 --no-risk
 """
 
+import argparse
+import logging
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -14,46 +21,90 @@ from src.backtest.engine import backtest_strategy
 from src.reporting.metrics import calculate_metrics
 from src.risk.manager import RiskConfig, summarise_risk_events
 
+logger = logging.getLogger(__name__)
+
+
+def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Momentum strategy backtester with risk management.",
+    )
+
+    # data
+    parser.add_argument("--ticker", default="SPY", help="Yahoo Finance symbol (default: SPY)")
+    parser.add_argument("--start", default="2010-01-01", help="Start date YYYY-MM-DD (default: 2010-01-01)")
+
+    # strategy
+    parser.add_argument("--lookback", type=int, default=200, help="Momentum lookback period (default: 200)")
+    parser.add_argument("--threshold", type=float, default=0.005, help="Signal threshold (default: 0.005)")
+    parser.add_argument("--no-sma-filter", action="store_true", help="Disable SMA-200 regime filter")
+
+    # vol targeting
+    parser.add_argument("--vol-target", type=float, default=0.15, help="Annualised vol target (default: 0.15)")
+    parser.add_argument("--vol-window", type=int, default=20, help="Realised vol window (default: 20)")
+
+    # risk management
+    parser.add_argument("--no-risk", action="store_true", help="Disable all risk controls")
+    parser.add_argument("--stop-loss", type=float, default=0.05, help="Stop-loss threshold (default: 0.05)")
+    parser.add_argument("--take-profit", type=float, default=0.10, help="Take-profit threshold (default: 0.10)")
+    parser.add_argument("--trailing-stop", type=float, default=0.03, help="Trailing stop threshold (default: 0.03)")
+    parser.add_argument("--max-position", type=float, default=1.0, help="Max position size (default: 1.0)")
+    parser.add_argument("--daily-loss-limit", type=float, default=0.02, help="Daily loss limit (default: 0.02)")
+
+    # costs
+    parser.add_argument("--cost", type=float, default=0.001, help="Transaction cost (default: 0.001)")
+
+    # output
+    parser.add_argument("--output-dir", default="results", help="Output directory (default: results)")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable debug logging")
+
+    return parser.parse_args()
+
+
+def setup_logging(verbose: bool = False) -> None:
+    """Configure logging format and level."""
+    level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%H:%M:%S",
+        level=level,
+    )
+
 
 def main() -> None:
-    # --- configuration ---
-    ticker = "SPY"
-    start_date = "2010-01-01"
-    transaction_cost = 0.001
+    args = parse_args()
+    setup_logging(args.verbose)
 
-    lookback = 200
-    threshold = 0.005
-    use_sma_filter = True
-
-    vol_target = 0.15
-    vol_window = 20
-
-    risk_config = RiskConfig(
-        stop_loss=0.05,
-        take_profit=0.10,
-        trailing_stop=0.03,
-        max_position=1.0,
-        daily_loss_limit=0.02,
-    )
+    # --- risk config ---
+    risk_config = None
+    if not args.no_risk:
+        risk_config = RiskConfig(
+            stop_loss=args.stop_loss,
+            take_profit=args.take_profit,
+            trailing_stop=args.trailing_stop,
+            max_position=args.max_position,
+            daily_loss_limit=args.daily_loss_limit,
+        )
 
     # --- pipeline ---
-    print("Loading data...")
-    df = load_yahoo_ohlcv(ticker=ticker, start=start_date)
+    logger.info("Loading %s data from %s...", args.ticker, args.start)
+    df = load_yahoo_ohlcv(ticker=args.ticker, start=args.start)
+    logger.info("Loaded %d rows.", len(df))
 
-    print("Generating signals...")
+    logger.info("Generating signals (lookback=%d, threshold=%.4f)...", args.lookback, args.threshold)
     strategy_df = momentum_strategy(
         df,
-        lookback=lookback,
-        threshold=threshold,
-        use_sma_filter=use_sma_filter,
+        lookback=args.lookback,
+        threshold=args.threshold,
+        use_sma_filter=not args.no_sma_filter,
     )
 
-    print("Running backtest...")
+    logger.info("Running backtest...")
     backtest_df, trade_log = backtest_strategy(
         strategy_df,
-        transaction_cost=transaction_cost,
-        vol_target=vol_target,
-        vol_window=vol_window,
+        transaction_cost=args.cost,
+        vol_target=args.vol_target,
+        vol_window=args.vol_window,
         risk_config=risk_config,
     )
 
@@ -69,11 +120,12 @@ def main() -> None:
             print(f"  {key}: {value}")
 
     # --- risk events summary ---
-    risk_events = summarise_risk_events(backtest_df)
-    if risk_events:
-        print("\n=== Risk Events ===")
-        for event, count in risk_events.items():
-            print(f"  {event}: {count}")
+    if risk_config is not None:
+        risk_events = summarise_risk_events(backtest_df)
+        if risk_events:
+            print("\n=== Risk Events ===")
+            for event, count in risk_events.items():
+                print(f"  {event}: {count}")
 
     # --- trade log ---
     print("\n=== Trade Log (last 5) ===")
@@ -83,23 +135,24 @@ def main() -> None:
         print("  No trades found.")
 
     # --- save outputs ---
-    output_dir = Path("results")
+    output_dir = Path(args.output_dir)
     output_dir.mkdir(exist_ok=True)
 
-    trade_log.to_csv(output_dir / "trade_log_spy_mom.csv", index=False)
-    print(f"\nSaved: {output_dir / 'trade_log_spy_mom.csv'}")
+    trade_log_file = output_dir / f"trade_log_{args.ticker.lower()}_mom.csv"
+    trade_log.to_csv(trade_log_file, index=False)
+    logger.info("Saved: %s", trade_log_file)
 
     # equity curve vs buy-and-hold
     backtest_df["buy_hold_returns"] = backtest_df["close"].pct_change().fillna(0)
     backtest_df["buy_hold_equity"] = (1 + backtest_df["buy_hold_returns"]).cumprod()
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(backtest_df.index, backtest_df["equity_curve"], label="Strategy")
-    ax.plot(backtest_df.index, backtest_df["buy_hold_equity"], label="Buy & Hold SPY")
+    ax.plot(backtest_df.index, backtest_df["equity_curve"], label="Strategy", linewidth=1.2)
+    ax.plot(backtest_df.index, backtest_df["buy_hold_equity"], label=f"Buy & Hold {args.ticker}", linewidth=1.2)
     ax.set_title(
-        f"{ticker} Momentum Strategy vs Buy-and-Hold\n"
-        f"lookback={lookback}, threshold={threshold}, "
-        f"SMA200={use_sma_filter}, vol_target={vol_target}"
+        f"{args.ticker} Momentum Strategy vs Buy-and-Hold\n"
+        f"lookback={args.lookback}, threshold={args.threshold}, "
+        f"SMA200={not args.no_sma_filter}, vol_target={args.vol_target}"
     )
     ax.set_xlabel("Date")
     ax.set_ylabel("Equity")
@@ -107,21 +160,16 @@ def main() -> None:
     ax.grid(alpha=0.3)
     fig.tight_layout()
 
-    equity_plot_file = output_dir / "equity_vs_buyhold.png"
+    equity_plot_file = output_dir / f"equity_vs_buyhold_{args.ticker.lower()}.png"
     fig.savefig(equity_plot_file, dpi=150)
     plt.close(fig)
-    print(f"Saved: {equity_plot_file}")
+    logger.info("Saved: %s", equity_plot_file)
 
     # summary table
     print("\n=== Backtest Data (last 10 rows) ===")
     cols_to_show = [
-        "close",
-        "signal",
-        "position",
-        "scaled_position",
-        "strategy_returns",
-        "equity_curve",
-        "buy_hold_equity",
+        "close", "signal", "position", "scaled_position",
+        "strategy_returns", "equity_curve", "buy_hold_equity",
     ]
     existing_cols = [c for c in cols_to_show if c in backtest_df.columns]
     print(backtest_df[existing_cols].tail(10))
