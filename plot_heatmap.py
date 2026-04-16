@@ -1,32 +1,39 @@
+"""Generate a Sharpe Ratio heatmap from sweep results."""
+
+from pathlib import Path
+
+import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
 
 
-# wczytaj wyniki grid search
-df = pd.read_csv("results/grid_search_results.csv")
+def plot_heatmap(csv_path: str = "results/sweep_results.csv") -> None:
+    """Read sweep results and create a lookback x threshold heatmap.
 
-# pivot do heatmapy
-heatmap_data = df.pivot(
-    index="lookback",
-    columns="threshold",
-    values="sharpe"
-)
+    Args:
+        csv_path: Path to the sweep CSV file.
+    """
+    df = pd.read_csv(csv_path)
 
-plt.figure(figsize=(8, 6))
+    pivot = df.pivot_table(
+        index="lookback",
+        columns="threshold",
+        values="sharpe",
+        aggfunc="first",
+    )
 
-sns.heatmap(
-    heatmap_data,
-    annot=True,
-    cmap="RdYlGn",
-    fmt=".2f"
-)
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.heatmap(pivot, annot=True, fmt=".2f", cmap="RdYlGn", ax=ax)
+    ax.set_title("Sharpe Ratio — Lookback x Threshold")
+    ax.set_ylabel("Lookback")
+    ax.set_xlabel("Threshold")
+    fig.tight_layout()
 
-plt.title("Momentum Strategy Sharpe Ratio Heatmap")
-plt.xlabel("Threshold")
-plt.ylabel("Lookback")
+    output_path = Path("results") / "parameter_heatmap.png"
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)
+    print(f"Saved: {output_path}")
 
-plt.tight_layout()
-plt.savefig("results/parameter_heatmap.png")
 
-plt.show()
+if __name__ == "__main__":
+    plot_heatmap()
