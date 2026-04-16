@@ -3,6 +3,9 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
+dist/
+build/
 
 # Virtual environments
 .venv/
@@ -11,15 +14,24 @@ venv/
 # IDE
 .idea/
 .vscode/
-
-# Data / outputs
-*.csv
-*.png
+*.swp
+*.swo
 
 # OS
 .DS_Store
 Thumbs.db
-# Allow result artifacts
+
+# Data / outputs (keep results/ tracked)
+*.csv
+*.png
 !results/
-!results/*.png
 !results/*.csv
+!results/*.png
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy
+.mypy_cache/
