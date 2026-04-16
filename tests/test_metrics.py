@@ -1,6 +1,8 @@
-import pytest
+"""Tests for performance metrics calculation."""
+
 import pandas as pd
-import numpy as np
+import pytest
+
 from src.reporting.metrics import calculate_metrics
 
 
@@ -10,6 +12,7 @@ def test_metrics_positive_returns():
 
     assert metrics["Total Return"] > 0
     assert metrics["Sharpe Ratio"] > 0
+    assert metrics["Sortino Ratio"] > 0
     assert metrics["Max Drawdown"] <= 0
 
 
@@ -19,6 +22,8 @@ def test_metrics_empty_returns():
 
     assert metrics["Total Return"] == 0.0
     assert metrics["Sharpe Ratio"] == 0.0
+    assert metrics["Sortino Ratio"] == 0.0
+    assert metrics["Calmar Ratio"] == 0.0
 
 
 def test_metrics_all_negative():
@@ -27,3 +32,19 @@ def test_metrics_all_negative():
 
     assert metrics["Total Return"] < 0
     assert metrics["Max Drawdown"] < 0
+    assert metrics["Sharpe Ratio"] < 0
+
+
+def test_metrics_keys():
+    returns = pd.Series([0.01, -0.005])
+    metrics = calculate_metrics(returns)
+
+    expected_keys = {
+        "Total Return",
+        "CAGR",
+        "Sharpe Ratio",
+        "Sortino Ratio",
+        "Max Drawdown",
+        "Calmar Ratio",
+    }
+    assert set(metrics.keys()) == expected_keys

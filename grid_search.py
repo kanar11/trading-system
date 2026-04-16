@@ -1,3 +1,9 @@
+"""Grid search over momentum strategy parameters.
+
+Evaluates all combinations of lookback and threshold, then exports
+a ranked CSV with performance metrics.
+"""
+
 from pathlib import Path
 
 import pandas as pd
@@ -8,7 +14,12 @@ from src.backtest.engine import backtest_strategy
 from src.reporting.metrics import calculate_metrics
 
 
-def run_grid_search():
+def run_grid_search() -> pd.DataFrame:
+    """Run parameter grid search and save results to CSV.
+
+    Returns:
+        DataFrame of results ranked by Sharpe Ratio.
+    """
     ticker = "SPY"
     start_date = "2015-01-01"
     transaction_cost = 0.001
@@ -19,7 +30,7 @@ def run_grid_search():
     print("Loading data...")
     df = load_yahoo_ohlcv(ticker=ticker, start=start_date)
 
-    results = []
+    results: list[dict] = []
 
     for lookback in lookbacks:
         for threshold in thresholds:
@@ -29,39 +40,38 @@ def run_grid_search():
                 df.copy(),
                 lookback=lookback,
                 threshold=threshold,
-                use_sma_filter=True
+                use_sma_filter=True,
             )
 
             backtest_df, trade_log = backtest_strategy(
                 strategy_df,
                 transaction_cost=transaction_cost,
                 vol_target=0.15,
-                vol_window=20
+                vol_window=20,
             )
 
             metrics = calculate_metrics(backtest_df["strategy_returns"])
 
-            row = {
-                "ticker": ticker,
-                "lookback": lookback,
-                "threshold": threshold,
-                "vol_target": 0.15,
-                "vol_window": 20,
-                "total_return": metrics["Total Return"],
-                "cagr": metrics["CAGR"],
-                "sharpe": metrics["Sharpe Ratio"],
-                "max_drawdown": metrics["Max Drawdown"],
-                "num_trades": len(trade_log),
-            }
+            results.append(
+                {
+                    "ticker": ticker,
+                    "lookback": lookback,
+                    "threshold": threshold,
+                    "vol_target": 0.15,
+                    "vol_window": 20,
+                    "total_return": metrics["Total Return"],
+                    "cagr": metrics["CAGR"],
+                    "sharpe": metrics["Sharpe Ratio"],
+                    "max_drawdown": metrics["Max Drawdown"],
+                    "num_trades": len(trade_log),
+                }
+            )
 
-            results.append(row)
-
-    results_df = pd.DataFrame(results)
-
-    results_df = results_df.sort_values(
-        by=["sharpe", "total_return"],
-        ascending=False
-    ).reset_index(drop=True)
+    results_df = (
+        pd.DataFrame(results)
+        .sort_values(by=["sharpe", "total_return"], ascending=False)
+        .reset_index(drop=True)
+    )
 
     output_dir = Path("results")
     output_dir.mkdir(exist_ok=True)
@@ -71,8 +81,9 @@ def run_grid_search():
 
     print("\n=== Top 10 Results ===")
     print(results_df.head(10))
+    print(f"\nSaved: {output_file}")
 
-    print(f"\nSaved grid search results to: {output_file}")
+    return results_df
 
 
 if __name__ == "__main__":
