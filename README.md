@@ -9,7 +9,8 @@ This project demonstrates a full research workflow: data ingestion, signal gener
 The system currently:
 
 - downloads historical OHLCV data using `yfinance` (any ticker)
-- generates trading signals using two strategies: momentum and mean reversion
+- generates trading signals using three strategies: momentum, mean reversion, and adaptive (regime-based)
+- detects market regimes (trending vs mean-reverting) using ADX and Hurst exponent
 - applies a cost-aware backtest with transaction costs and volatility targeting
 - enforces risk management rules (stop-loss, take-profit, trailing stop, position limits, daily loss limit)
 - runs walk-forward validation to test strategy robustness (rolling IS/OOS)
@@ -22,6 +23,12 @@ The system currently:
 - Yahoo Finance OHLCV data loader with validation
 - **Momentum strategy** with configurable lookback, threshold, and SMA-200 regime filter
 - **Mean reversion strategy** based on Bollinger Bands with RSI confirmation filter
+- **Adaptive strategy** with automatic regime detection:
+  - ADX (Average Directional Index) for trend strength
+  - Rolling Hurst exponent for mean-reversion detection
+  - Volatility regime classification (high/low)
+  - Smoothing to prevent regime whipsawing
+  - Auto-selects momentum in trends, mean reversion in ranges, flat in undefined
 - Cost-aware backtesting engine with volatility targeting
 - Risk management module:
   - stop-loss (configurable threshold)
@@ -53,6 +60,8 @@ trading_system/
 │   │   └── engine.py              # Cost-aware backtest engine
 │   ├── risk/
 │   │   └── manager.py             # Risk management controls
+│   ├── regime/
+│   │   └── detector.py            # Market regime detection (ADX + Hurst)
 │   ├── validation/
 │   │   └── walk_forward.py        # Walk-forward validation framework
 │   └── reporting/
@@ -67,6 +76,7 @@ trading_system/
 │   ├── test_momentum.py
 │   ├── test_mean_reversion.py
 │   ├── test_walk_forward.py
+│   ├── test_regime.py
 │   └── test_engine.py
 ├── main.py                        # Main pipeline entry point (CLI)
 ├── grid_search.py                 # Grid search script
@@ -118,6 +128,9 @@ python main.py --no-risk
 # walk-forward validation
 python main.py --walk-forward
 
+# adaptive (regime-based) strategy
+python main.py --strategy adaptive
+
 # walk-forward with mean reversion
 python main.py --strategy mean-reversion --walk-forward --wf-is-days 252 --wf-oos-days 63
 
@@ -149,6 +162,14 @@ Uses Bollinger Bands to detect overbought/oversold conditions. Enters when price
 python main.py --strategy mean-reversion --bb-window 20 --bb-std 2.0 --rsi-period 14
 ```
 
+### Adaptive (Regime-Based)
+
+Automatically detects the market regime using ADX (trend strength) and Hurst exponent (mean-reversion tendency). Applies the momentum strategy during trending periods, mean reversion during range-bound periods, and goes flat when the regime is unclear.
+
+```bash
+python main.py --strategy adaptive --adx-threshold 25 --hurst-window 100
+```
+
 ## Walk-forward validation
 
 Tests strategy robustness by splitting data into rolling in-sample (training) and out-of-sample (testing) windows. Reports per-fold metrics, combined OOS equity, and IS-vs-OOS Sharpe degradation.
@@ -177,7 +198,7 @@ Set any parameter to `None` (or use `--no-risk` in CLI) to disable.
 
 ## Limitations
 
-This is a research prototype, not a production trading system. Current limitations include single instrument per run, Yahoo Finance data only, and no portfolio-level construction.
+This is a research prototype, not a production trading system. Current limitations include single instrument per run, Yahoo Finance data only, no portfolio-level construction, and simplified regime detection (not a hidden Markov model).
 
 ## Tech stack
 

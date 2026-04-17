@@ -1,11 +1,12 @@
 """Main entry point for the backtesting pipeline.
 
-Supports momentum and mean reversion strategies with optional risk
-management and walk-forward validation.
+Supports momentum, mean reversion, and adaptive (regime-based) strategies
+with optional risk management and walk-forward validation.
 
 Usage:
     python main.py
     python main.py --strategy mean-reversion --ticker AAPL
+    python main.py --strategy adaptive
     python main.py --lookback 100 --threshold 0.01 --no-risk
     python main.py --walk-forward
 """
@@ -23,6 +24,7 @@ from src.strategy.mean_reversion import mean_reversion_strategy
 from src.backtest.engine import backtest_strategy
 from src.reporting.metrics import calculate_metrics
 from src.risk.manager import RiskConfig, summarise_risk_events
+from src.regime.detector import adaptive_strategy, RegimeConfig
 from src.validation.walk_forward import (
     WalkForwardConfig,
     run_walk_forward,
@@ -44,8 +46,9 @@ def parse_args() -> argparse.Namespace:
 
     # strategy selection
     parser.add_argument(
-        "--strategy", choices=["momentum", "mean-reversion"], default="momentum",
-        help="Strategy type (default: momentum)",
+        "--strategy", choices=["momentum", "mean-reversion", "adaptive"],
+        default="momentum",
+        help="Strategy type: momentum, mean-reversion, or adaptive (default: momentum)",
     )
 
     # momentum params
@@ -60,6 +63,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rsi-oversold", type=float, default=30.0, help="RSI oversold level (default: 30)")
     parser.add_argument("--rsi-overbought", type=float, default=70.0, help="RSI overbought level (default: 70)")
     parser.add_argument("--no-rsi-filter", action="store_true", help="Disable RSI filter for mean reversion")
+
+    # regime detection (adaptive mode)
+    parser.add_argument("--adx-period", type=int, default=14, help="ADX period for regime detection (default: 14)")
+    parser.add_argument("--adx-threshold", type=float, default=25.0, help="ADX trending threshold (default: 25)")
+    parser.add_argument("--hurst-window", type=int, default=100, help="Hurst exponent window (default: 100)")
 
     # vol targeting
     parser.add_argument("--vol-target", type=float, default=0.15, help="Annualised vol target (default: 0.15)")
@@ -100,23 +108,38 @@ def setup_logging(verbose: bool = False) -> None:
 
 def _build_strategy_fn(args: argparse.Namespace):
     """Return a strategy function based on CLI args."""
-    if args.strategy == "mean-reversion":
-        return partial(
-            mean_reversion_strategy,
-            bb_window=args.bb_window,
-            bb_std=args.bb_std,
-            rsi_period=args.rsi_period,
-            rsi_oversold=args.rsi_oversold,
-            rsi_overbought=args.rsi_overbought,
-            use_rsi_filter=not args.no_rsi_filter,
+    mom_fn = partial(
+        momentum_strategy,
+        lookback=args.lookback,
+        threshold=args.threshold,
+        use_sma_filter=not args.no_sma_filter,
+    )
+    mr_fn = partial(
+        mean_reversion_strategy,
+        bb_window=args.bb_window,
+        bb_std=args.bb_std,
+        rsi_period=args.rsi_period,
+        rsi_oversold=args.rsi_oversold,
+        rsi_overbought=args.rsi_overbought,
+        use_rsi_filter=not args.no_rsi_filter,
+    )
+
+    if args.strategy == "adaptive":
+        regime_config = RegimeConfig(
+            adx_period=args.adx_period,
+            adx_trending_threshold=args.adx_threshold,
+            hurst_window=args.hurst_window,
         )
+        return partial(
+            adaptive_strategy,
+            momentum_fn=mom_fn,
+            mean_reversion_fn=mr_fn,
+            config=regime_config,
+        )
+    elif args.strategy == "mean-reversion":
+        return mr_fn
     else:
-        return partial(
-            momentum_strategy,
-            lookback=args.lookback,
-            threshold=args.threshold,
-            use_sma_filter=not args.no_sma_filter,
-        )
+        return mom_fn
 
 
 def _build_backtest_fn(args: argparse.Namespace, risk_config: RiskConfig | None):
