@@ -1,27 +1,27 @@
 # Systematic Trading Research Backtester
 
-A Python research project for designing, testing, and evaluating systematic momentum strategies on SPY market data.
+A Python research project for designing, testing, and evaluating systematic trading strategies on market data.
 
-This project demonstrates a full research workflow: data ingestion, signal generation, cost-aware backtesting with risk management, performance evaluation, trade-level analysis, and parameter experimentation.
+This project demonstrates a full research workflow: data ingestion, signal generation, cost-aware backtesting with risk management, performance evaluation, trade-level analysis, parameter optimisation, and walk-forward validation.
 
 ## What the project does
 
 The system currently:
 
-- downloads historical SPY OHLCV data using `yfinance`
-- generates momentum-based trading signals with optional SMA-200 regime filter
+- downloads historical OHLCV data using `yfinance` (any ticker)
+- generates trading signals using two strategies: momentum and mean reversion
 - applies a cost-aware backtest with transaction costs and volatility targeting
 - enforces risk management rules (stop-loss, take-profit, trailing stop, position limits, daily loss limit)
-- builds an equity curve and saves it as a plot
-- calculates core performance statistics (Sharpe, Sortino, Calmar, CAGR, Max Drawdown)
-- exports a trade log for trade-level review
-- runs parameter sweeps across multiple lookback / threshold settings
+- runs walk-forward validation to test strategy robustness (rolling IS/OOS)
+- builds equity curves and saves them as plots
+- calculates performance statistics (Sharpe, Sortino, Calmar, CAGR, Max Drawdown)
+- exports trade logs and parameter sweep results
 
 ## Current features
 
 - Yahoo Finance OHLCV data loader with validation
-- Momentum strategy with configurable lookback and threshold
-- SMA-200 regime filter
+- **Momentum strategy** with configurable lookback, threshold, and SMA-200 regime filter
+- **Mean reversion strategy** based on Bollinger Bands with RSI confirmation filter
 - Cost-aware backtesting engine with volatility targeting
 - Risk management module:
   - stop-loss (configurable threshold)
@@ -29,17 +29,15 @@ The system currently:
   - trailing stop (peak-to-trough)
   - maximum position size cap
   - daily loss limit (circuit breaker)
-- Equity curve plot export
-- Performance metrics:
-  - Total Return
-  - CAGR
-  - Sharpe Ratio
-  - Sortino Ratio
-  - Max Drawdown
-  - Calmar Ratio
+- **Walk-forward validation**:
+  - rolling in-sample / out-of-sample windows
+  - per-fold and aggregated OOS metrics
+  - IS vs OOS Sharpe degradation analysis
+  - combined OOS equity curve
+- Performance metrics: Total Return, CAGR, Sharpe, Sortino, Max Drawdown, Calmar
 - Trade log with entry/exit dates, prices, direction, return, and holding period
 - Parameter sweep for comparing multiple strategy configurations
-- Export of research outputs to CSV / PNG files
+- Full CLI with argparse for reproducible research runs
 
 ## Project structure
 
@@ -47,26 +45,33 @@ The system currently:
 trading_system/
 ├── src/
 │   ├── data/
-│   │   └── loader.py          # Yahoo Finance data download
+│   │   └── loader.py              # Yahoo Finance data download
 │   ├── strategy/
-│   │   └── momentum.py        # Momentum signal generator
+│   │   ├── momentum.py            # Momentum signal generator
+│   │   └── mean_reversion.py      # Bollinger Bands + RSI strategy
 │   ├── backtest/
-│   │   └── engine.py          # Cost-aware backtest engine
+│   │   └── engine.py              # Cost-aware backtest engine
 │   ├── risk/
-│   │   └── manager.py         # Risk management controls
+│   │   └── manager.py             # Risk management controls
+│   ├── validation/
+│   │   └── walk_forward.py        # Walk-forward validation framework
 │   └── reporting/
-│       ├── metrics.py         # Performance metrics
-│       ├── plots.py           # Equity curve plotting
-│       ├── trades.py          # Trade log builder
-│       └── sweep.py           # Parameter sweep runner
+│       ├── metrics.py             # Performance metrics
+│       ├── plots.py               # Equity curve plotting
+│       ├── trades.py              # Trade log builder (standalone)
+│       └── sweep.py               # Parameter sweep runner
 ├── tests/
+│   ├── conftest.py
 │   ├── test_metrics.py
 │   ├── test_risk_manager.py
 │   ├── test_momentum.py
+│   ├── test_mean_reversion.py
+│   ├── test_walk_forward.py
 │   └── test_engine.py
-├── main.py                    # Main pipeline entry point
-├── grid_search.py             # Grid search script
-├── plot_heatmap.py            # Heatmap visualisation
+├── main.py                        # Main pipeline entry point (CLI)
+├── grid_search.py                 # Grid search script
+├── plot_heatmap.py                # Heatmap visualisation
+├── pyproject.toml                 # Project config and dependencies
 ├── requirements.txt
 └── README.md
 ```
@@ -98,7 +103,26 @@ pip install -r requirements.txt
 ### 3. Run the project
 
 ```bash
+# default: momentum strategy on SPY
 python main.py
+
+# mean reversion strategy on AAPL
+python main.py --strategy mean-reversion --ticker AAPL
+
+# custom momentum parameters
+python main.py --lookback 100 --threshold 0.01 --no-sma-filter
+
+# disable risk management
+python main.py --no-risk
+
+# walk-forward validation
+python main.py --walk-forward
+
+# walk-forward with mean reversion
+python main.py --strategy mean-reversion --walk-forward --wf-is-days 252 --wf-oos-days 63
+
+# verbose logging
+python main.py -v
 ```
 
 ### 4. Run tests
@@ -107,21 +131,37 @@ python main.py
 pytest tests/ -v
 ```
 
-## Example research workflow
+## Strategies
 
-A typical workflow in this project is:
+### Momentum
 
-1. Load SPY data
-2. Choose strategy parameters (lookback, threshold)
-3. Generate momentum signals
-4. Run the backtest with costs and risk controls
-5. Review metrics and equity curve
-6. Inspect the trade log and risk events
-7. Compare multiple parameter settings via grid search
+Generates signals based on lookback returns with an optional SMA-200 regime filter. Goes long when the lookback return exceeds the threshold, short when it falls below.
+
+```bash
+python main.py --strategy momentum --lookback 200 --threshold 0.005
+```
+
+### Mean Reversion
+
+Uses Bollinger Bands to detect overbought/oversold conditions. Enters when price moves outside the bands and exits when it reverts to the middle band. RSI acts as a confirmation filter.
+
+```bash
+python main.py --strategy mean-reversion --bb-window 20 --bb-std 2.0 --rsi-period 14
+```
+
+## Walk-forward validation
+
+Tests strategy robustness by splitting data into rolling in-sample (training) and out-of-sample (testing) windows. Reports per-fold metrics, combined OOS equity, and IS-vs-OOS Sharpe degradation.
+
+```bash
+python main.py --walk-forward --wf-is-days 504 --wf-oos-days 126
+```
+
+A degradation above 50% suggests the strategy may be overfitting to in-sample data.
 
 ## Risk management configuration
 
-Risk controls are configured through `RiskConfig` in `main.py`:
+Risk controls are configured via CLI flags or through `RiskConfig`:
 
 ```python
 risk_config = RiskConfig(
@@ -133,28 +173,17 @@ risk_config = RiskConfig(
 )
 ```
 
-Set any parameter to `None` to disable that rule.
-
-## Current outputs
-
-Example outputs generated by the project:
-
-- `results/equity_vs_buyhold.png` — equity curve vs buy-and-hold
-- `results/trade_log_spy_mom.csv` — trade-level log
-- `results/sweep_results.csv` — parameter sweep results
-- `results/parameter_heatmap.png` — Sharpe Ratio heatmap
+Set any parameter to `None` (or use `--no-risk` in CLI) to disable.
 
 ## Limitations
 
-This is a research prototype, not a production trading system. Current limitations include single instrument only, Yahoo Finance data, simple momentum logic, no portfolio construction, and no walk-forward validation.
+This is a research prototype, not a production trading system. Current limitations include single instrument per run, Yahoo Finance data only, and no portfolio-level construction.
 
 ## Tech stack
 
-- Python
-- pandas
-- numpy
-- matplotlib
-- seaborn
+- Python 3.11+
+- pandas, NumPy
+- matplotlib, seaborn
 - yfinance
 - pytest
 

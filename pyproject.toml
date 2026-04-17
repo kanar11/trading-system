@@ -1,7 +1,7 @@
 [project]
 name = "trading-system"
-version = "0.2.0"
-description = "Systematic momentum strategy backtester with risk management"
+version = "0.3.0"
+description = "Systematic trading backtester with momentum, mean reversion, risk management, and walk-forward validation"
 requires-python = ">=3.11"
 dependencies = [
     "pandas>=2.0",
