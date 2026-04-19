@@ -22,7 +22,7 @@ from src.data.loader import load_yahoo_ohlcv
 from src.strategy.momentum import momentum_strategy
 from src.strategy.mean_reversion import mean_reversion_strategy
 from src.backtest.engine import backtest_strategy
-from src.reporting.metrics import calculate_metrics
+from src.reporting.metrics import calculate_metrics, calculate_trade_stats
 from src.risk.manager import RiskConfig, summarise_risk_events
 from src.regime.detector import adaptive_strategy, RegimeConfig
 from src.validation.walk_forward import (
@@ -229,6 +229,25 @@ def main() -> None:
             print("\n=== Risk Events ===")
             for event, count in risk_events.items():
                 print(f"  {event}: {count}")
+
+    # --- trade-level analytics ---
+    trade_stats = calculate_trade_stats(trade_log)
+    if trade_stats["Total Trades"] > 0:
+        print(f"\n=== Trade Analytics ===")
+        print(f"  Win Rate:        {trade_stats['Win Rate']:.1%}  ({trade_stats['Winners']}W / {trade_stats['Losers']}L)")
+        print(f"  Profit Factor:   {trade_stats['Profit Factor']:.2f}")
+        print(f"  Expectancy:      {trade_stats['Expectancy']:.4f}")
+        print(f"  Payoff Ratio:    {trade_stats['Payoff Ratio']:.2f}")
+        print(f"  Avg Win:         {trade_stats['Avg Win']:.4f}")
+        print(f"  Avg Loss:        {trade_stats['Avg Loss']:.4f}")
+        print(f"  Largest Win:     {trade_stats['Largest Win']:.4f}")
+        print(f"  Largest Loss:    {trade_stats['Largest Loss']:.4f}")
+        print(f"  Max Win Streak:  {trade_stats['Max Win Streak']}")
+        print(f"  Max Loss Streak: {trade_stats['Max Loss Streak']}")
+        if trade_stats["Avg Holding Days"] > 0:
+            print(f"  Avg Holding:     {trade_stats['Avg Holding Days']:.0f} days")
+        if trade_stats["Long Trades"] + trade_stats["Short Trades"] > 0:
+            print(f"  Long/Short:      {trade_stats['Long Trades']}L / {trade_stats['Short Trades']}S")
 
     # --- trade log ---
     print("\n=== Trade Log (last 5) ===")
