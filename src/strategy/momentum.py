@@ -4,7 +4,11 @@ Computes a lookback return and generates long/short signals
 with an optional SMA-200 regime filter.
 """
 
+import logging
+
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 def momentum_strategy(

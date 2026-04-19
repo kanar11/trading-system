@@ -1,5 +1,15 @@
 """Market regime detection and adaptive strategy selection."""
 
-from src.regime.detector import detect_regime, RegimeConfig, RegimeType
+from src.regime.detector import (
+    RegimeConfig,
+    RegimeType,
+    adaptive_strategy,
+    detect_regime,
+)
 
-__all__ = ["detect_regime", "RegimeConfig", "RegimeType"]
+__all__ = [
+    "RegimeConfig",
+    "RegimeType",
+    "adaptive_strategy",
+    "detect_regime",
+]

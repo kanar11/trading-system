@@ -255,7 +255,7 @@ def print_walk_forward_report(results: dict) -> None:
     print(f"  Degradation:       {d['sharpe_degradation_pct']:.1f}%")
 
     if d["sharpe_degradation_pct"] > 50:
-        print("  ⚠ High degradation — strategy may be overfitting in-sample data.")
+        print("  [!] High degradation — strategy may be overfitting in-sample data.")
     elif d["sharpe_degradation_pct"] < 20:
         print("  Strategy shows good robustness across folds.")
 

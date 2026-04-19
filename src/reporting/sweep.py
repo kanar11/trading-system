@@ -4,7 +4,6 @@ Evaluates a momentum strategy across a grid of lookback / threshold
 combinations and exports ranked results to CSV.
 """
 
-import argparse
 import logging
 from pathlib import Path
 
@@ -13,7 +12,7 @@ import pandas as pd
 from src.data.loader import load_yahoo_ohlcv
 from src.strategy.momentum import momentum_strategy
 from src.backtest.engine import backtest_strategy
-from src.reporting.metrics import calculate_metrics
+from src.reporting.metrics import calculate_metrics, calculate_trade_stats
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +69,7 @@ def run_sweep(
             )
 
             metrics = calculate_metrics(backtest_df["strategy_returns"])
+            trade_stats = calculate_trade_stats(trade_log)
 
             results.append(
                 {
@@ -82,7 +82,10 @@ def run_sweep(
                     "sortino": metrics["Sortino Ratio"],
                     "max_drawdown": metrics["Max Drawdown"],
                     "calmar": metrics["Calmar Ratio"],
-                    "num_trades": len(trade_log),
+                    "num_trades": trade_stats["Total Trades"],
+                    "win_rate": trade_stats["Win Rate"],
+                    "profit_factor": trade_stats["Profit Factor"],
+                    "expectancy": trade_stats["Expectancy"],
                 }
             )
 

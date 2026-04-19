@@ -1,7 +1,11 @@
 """Plotting utilities for backtest results."""
 
+import logging
+
 import matplotlib.pyplot as plt
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 def plot_equity(

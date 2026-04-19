@@ -4,8 +4,12 @@ Runs a vectorised backtest with transaction costs, optional volatility targeting
 and optional risk management controls. Produces an equity curve and trade log.
 """
 
-import pandas as pd
+import logging
+
 import numpy as np
+import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 from src.risk.manager import RiskConfig, apply_risk_controls
 
