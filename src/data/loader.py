@@ -3,8 +3,12 @@
 Downloads OHLCV data from Yahoo Finance and normalises column names.
 """
 
+import logging
+
 import pandas as pd
 import yfinance as yf
+
+logger = logging.getLogger(__name__)
 
 REQUIRED_COLS = ["open", "high", "low", "close", "volume"]
 

@@ -7,7 +7,11 @@ built inside ``src.backtest.engine``.
 For normal backtests you do NOT need to call this module directly.
 """
 
+import logging
+
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 def build_trade_log(result: pd.DataFrame) -> pd.DataFrame:

@@ -5,8 +5,12 @@ moving average, expecting a reversion to the mean. Uses Bollinger Bands
 for entry/exit zones and RSI as a confirmation filter.
 """
 
+import logging
+
 import numpy as np
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 def _bollinger_bands(

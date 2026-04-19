@@ -15,6 +15,7 @@ The detected regime can be used to automatically select the best strategy:
 import logging
 from dataclasses import dataclass
 from enum import Enum
+from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -257,8 +258,8 @@ def _smooth_regime(
 
 def adaptive_strategy(
     df: pd.DataFrame,
-    momentum_fn,
-    mean_reversion_fn,
+    momentum_fn: Callable[[pd.DataFrame], pd.DataFrame],
+    mean_reversion_fn: Callable[[pd.DataFrame], pd.DataFrame],
     config: RegimeConfig | None = None,
 ) -> pd.DataFrame:
     """Apply regime-adaptive strategy selection.
