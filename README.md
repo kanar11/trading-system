@@ -12,11 +12,14 @@ The system currently:
 - generates trading signals using four strategies: momentum, mean reversion, Donchian breakout, and adaptive (regime-based)
 - detects market regimes (trending vs mean-reverting) using ADX and Hurst exponent
 - applies a cost-aware backtest with transaction costs and volatility targeting
+- models realistic execution costs (bid-ask spread + square-root market impact + fixed commission)
 - enforces risk management rules (stop-loss, take-profit, trailing stop, position limits, daily loss limit)
 - offers position-sizing helpers: fractional Kelly, ATR-based and fixed-fractional sizing
 - runs walk-forward validation to test strategy robustness (rolling IS/OOS)
 - runs Monte Carlo robustness analysis (bootstrap and trade-shuffle) for confidence intervals
-- aggregates single-asset strategies into a multi-asset portfolio (equal-weight, inverse-vol, or custom weights)
+- aggregates single-asset strategies into a multi-asset portfolio (equal-weight, inverse-vol, custom, min-variance, max-Sharpe, or risk-parity weights)
+- runs factor / attribution regression to separate alpha from passive factor exposure
+- generates multi-panel tear-sheet reports (equity, drawdown, rolling Sharpe, monthly heatmap, distribution)
 - computes trade-level analytics (win rate, profit factor, expectancy, streaks, payoff ratio)
 - builds equity curves and saves them as plots
 - calculates performance statistics (Sharpe, Sortino, Calmar, CAGR, Max Drawdown)
@@ -35,6 +38,8 @@ trading_system/
 │   │   └── breakout.py            # Donchian channel breakout (turtle-style)
 │   ├── backtest/
 │   │   └── engine.py              # Cost-aware backtest engine
+│   ├── execution/
+│   │   └── slippage.py            # Spread + sqrt-impact execution model
 │   ├── risk/
 │   │   ├── manager.py             # Risk management controls
 │   │   └── sizing.py              # Kelly / ATR / fixed-fractional sizing
@@ -44,12 +49,15 @@ trading_system/
 │   │   ├── walk_forward.py        # Walk-forward validation framework
 │   │   └── monte_carlo.py         # Bootstrap + trade-shuffle robustness
 │   ├── portfolio/
-│   │   └── portfolio.py           # Multi-asset portfolio backtest
+│   │   ├── portfolio.py           # Multi-asset portfolio backtest
+│   │   └── optimizer.py           # Min-variance / max-Sharpe / risk-parity weights
 │   └── reporting/
 │       ├── metrics.py             # Portfolio metrics + trade analytics
 │       ├── plots.py               # Equity curve plotting
 │       ├── trades.py              # Trade log builder (standalone utility)
-│       └── sweep.py               # Parameter sweep runner
+│       ├── sweep.py               # Parameter sweep runner
+│       ├── tearsheet.py           # Multi-panel PNG tear-sheet report
+│       └── attribution.py         # Factor / alpha regression
 ├── tests/
 │   ├── conftest.py                # Shared fixtures (OHLCV, returns)
 │   ├── test_metrics.py            # Portfolio + trade-level metric tests
@@ -62,6 +70,10 @@ trading_system/
 │   ├── test_breakout.py           # Donchian breakout tests
 │   ├── test_sizing.py             # Position-sizing tests
 │   ├── test_portfolio.py          # Portfolio backtest tests
+│   ├── test_optimizer.py          # Portfolio optimiser tests
+│   ├── test_execution.py          # Execution-cost model tests
+│   ├── test_tearsheet.py          # Tear-sheet generator tests
+│   ├── test_attribution.py        # Factor attribution tests
 │   └── test_engine.py             # Backtest engine tests
 ├── main.py                        # Main pipeline entry point (CLI)
 ├── grid_search.py                 # Grid search script
@@ -215,6 +227,26 @@ CLI flags: `--stop-loss`, `--take-profit`, `--trailing-stop`, `--max-position`, 
 
 All helpers return a position fraction in `[0, cap]` and degrade gracefully (return `0.0`) when the edge is non-positive.
 
+## Execution / slippage model
+
+`src/execution/slippage.py` replaces the engine's flat `transaction_cost` with a reduced-form model that captures the qualitative shape of real-world execution costs:
+
+```
+cost_fraction = 0.5 * spread_bps / 10_000
+              + impact_coeff * (|delta| / participation_cap) ** impact_exponent
+              + fixed_cost_per_trade
+```
+
+`spread_bps` covers the round-trip bid-ask spread, the impact term implements the square-root law (`impact_exponent=0.5` by default), and `fixed_cost_per_trade` covers per-trade commission. Apply it to an engine output via:
+
+```python
+from src.execution import ExecutionConfig, apply_execution_costs
+
+bt = apply_execution_costs(bt, ExecutionConfig(spread_bps=5, impact_coeff=0.1))
+```
+
+This recomputes `transaction_cost`, `strategy_returns` and `equity_curve` in place.
+
 ## Walk-forward validation
 
 Tests strategy robustness by splitting data into rolling in-sample (training) and out-of-sample (testing) windows. For each fold, the strategy runs on the full IS+OOS window to avoid warm-up artefacts, but only the OOS portion is evaluated. Reports per-fold metrics, combined OOS equity, and IS-vs-OOS Sharpe degradation.
@@ -239,8 +271,16 @@ Both return a `MonteCarloResult` with per-simulation metrics and a mean / std / 
 `src/portfolio/portfolio.py` runs the same single-asset strategy across a basket of tickers and aggregates the per-asset return streams into a portfolio using one of three weighting schemes:
 
 - **`equal`** — flat 1/N weights, rebalanced daily.
-- **`inverse_vol`** — weights inversely proportional to trailing realised volatility (risk-parity).
+- **`inverse_vol`** — weights inversely proportional to trailing realised volatility (simple risk-parity proxy).
 - **`custom`** — user-supplied static weights, normalised to sum to 1.
+
+For covariance-aware allocation, `src/portfolio/optimizer.py` provides three closed-form / iterative schemes (no scipy required):
+
+- **`min_variance_weights(returns, cov=None)`** — long-only minimum-variance portfolio via `Σ⁻¹ 1`.
+- **`max_sharpe_weights(returns, cov=None, rf_daily=0)`** — long-only tangency portfolio via `Σ⁻¹ (μ − rf)`.
+- **`risk_parity_weights(returns, cov=None)`** — true equal risk-contribution weights via cyclical coordinate descent (Maillard, Roncalli & Teïletche 2010).
+
+All optimisers clip negative weights to zero and re-normalise.
 
 ```python
 from src.portfolio import PortfolioConfig, run_portfolio_backtest
@@ -253,6 +293,43 @@ result = run_portfolio_backtest(
 print(result.metrics)        # portfolio-level Sharpe / MaxDD / etc.
 print(result.per_asset_metrics)  # one dict per ticker
 ```
+
+## Factor attribution
+
+`src/reporting/attribution.py` regresses daily strategy returns against one or more factor return streams:
+
+```
+r_strategy_t = alpha + Σ_i beta_i * f_{i,t} + epsilon_t
+```
+
+The intercept is the annualised excess return that *cannot* be explained by the supplied factors. Per-factor t-stats, R² and residuals are reported. Useful for asking "is my edge really alpha, or just a hidden momentum / market beta?"
+
+```python
+from src.reporting.attribution import factor_regression, print_attribution_report
+
+result = factor_regression(strategy_returns, factors=ff3_df, rf_rate=0.0)
+print_attribution_report(result)
+```
+
+Pure OLS via `numpy.linalg.lstsq` — no scipy needed.
+
+## Tear-sheet report
+
+`src/reporting/tearsheet.py` generates a single-PNG, multi-panel report with the equity curve (vs an optional benchmark), underwater drawdown, rolling Sharpe, monthly-returns heatmap, return distribution, and a performance summary table.
+
+```python
+from src.reporting.tearsheet import generate_tearsheet
+
+fig = generate_tearsheet(
+    strategy_returns,
+    benchmark=spy_returns,
+    trade_log=trade_log,
+    output_path="results/tearsheet.png",
+    title="SPY momentum tear-sheet",
+)
+```
+
+Returns a matplotlib `Figure` and writes a PNG. Headless-friendly — safe to call from CI.
 
 ## Trade-level analytics
 
@@ -292,7 +369,7 @@ Results are saved to `results/sweep_results.csv` and the top 10 configurations a
 
 ## Limitations
 
-This is a research prototype, not a production trading system. Current limitations include Yahoo Finance data only, simplified regime detection (not a hidden Markov model), portfolio aggregation that ignores cross-asset correlations and per-asset transaction costs at the basket level, and Monte Carlo resampling that assumes returns are stationary.
+This is a research prototype, not a production trading system. Current limitations include Yahoo Finance data only, simplified regime detection (not a hidden Markov model), execution-cost model that is reduced-form (no order-book simulation, no queue position), portfolio optimisers that clip negative weights rather than solving a constrained QP, and Monte Carlo resampling that assumes returns are stationary.
 
 ## Tech stack
 
