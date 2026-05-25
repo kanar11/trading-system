@@ -1,7 +1,7 @@
 [project]
 name = "trading-system"
-version = "0.7.0"
-description = "Systematic trading backtester with momentum, mean reversion, breakout, EMA/MACD crossover, pairs trading, ensemble and adaptive strategies, realistic execution costs, regime detection, risk management, position sizing, trade analytics, walk-forward validation, Monte Carlo robustness, Sharpe significance tests, multi-asset portfolios with covariance-aware optimisation, factor attribution and tear-sheet reporting"
+version = "0.8.0"
+description = "Professional-grade systematic trading research platform: vectorised + event-driven backtesting, OMS with cost-basis position tracking, comprehensive technical-indicator library, advanced risk metrics (VaR/CVaR/Omega/Ulcer), seven strategy templates with ensemble combiners, walk-forward + Monte Carlo + Deflated Sharpe validation, multi-asset portfolio optimisation, tear-sheet reporting, paper-broker live adapter, data cache + universe definitions"
 requires-python = ">=3.11"
 dependencies = [
     "pandas>=2.0",
