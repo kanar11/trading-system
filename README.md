@@ -1,32 +1,66 @@
-# Systematic Trading Research Backtester
+# Systematic Trading Research Platform
 
-A Python research project for designing, testing, and evaluating systematic trading strategies on market data.
+A Python research platform for designing, testing, and evaluating systematic trading strategies on market data — modelled after professional quant-trading stacks.
 
-This project demonstrates a full research workflow: data ingestion, signal generation, cost-aware backtesting with risk management, performance evaluation, trade-level analytics, parameter optimisation, and walk-forward validation.
+This project is structured around two complementary backtesting modes:
+
+1. **Vectorised mode** (`src.backtest.engine`) — signal-in / equity-out, blazing fast, ideal for parameter sweeps and walk-forward research.
+2. **Event-driven mode** (`src.backtest.event_engine`) — bar-by-bar simulation with a full Order Management System (limit / stop / stop-limit orders, partial fills, commission + slippage, cost-basis position tracking). Same API surface as the paper-broker live adapter, so strategies port straight to a live broker without rewrites.
+
+## Architecture
+
+```
+                       ┌──────────────────────────┐
+                       │      Strategy            │
+                       │  on_bar / signal funcs   │
+                       └─────────────┬────────────┘
+                                     │
+                  ┌──────────────────┴──────────────────┐
+                  │                                     │
+        ┌─────────▼──────────┐              ┌───────────▼─────────┐
+        │ Vectorised engine  │              │ Event-driven engine │
+        │ + Risk + Execution │              │  + OMS + Slippage   │
+        └─────────┬──────────┘              └───────────┬─────────┘
+                  │                                     │
+                  └──────────────────┬──────────────────┘
+                                     │
+                       ┌─────────────▼────────────┐
+                       │     Portfolio / OMS      │
+                       │ cash + positions + PnL   │
+                       └─────────────┬────────────┘
+                                     │
+                       ┌─────────────▼────────────┐
+                       │  Reporting + Validation  │
+                       │ metrics / tearsheet /    │
+                       │ MC bootstrap / WF / DSR  │
+                       └──────────────────────────┘
+```
+
+Plug-in points: indicators (`src.indicators`), position sizing (`src.risk.sizing`), risk metrics (`src.risk.metrics`), portfolio optimisation (`src.portfolio.optimizer`), and a paper broker (`src.live.broker`) that shares the same OMS as the event engine.
 
 ## What the project does
 
 The system currently:
 
-- downloads historical OHLCV data using `yfinance` (any ticker) or loads from local CSV
-- generates trading signals using seven strategies: momentum, mean reversion, Donchian breakout, EMA crossover, MACD, pairs (cointegration), and adaptive (regime-based)
+- downloads OHLCV data via `yfinance` or local CSV, with a transparent parquet-backed cache (`src.data.cache`)
+- ships pre-defined universes (FAANG, Dow 30, sector ETFs, benchmarks, factor ETFs) in `src.data.universe`
+- aggregates intraday bars to any frequency via `src.data.resample` (1m → 5m → 1h → 1D → 1W → 1ME)
+- maintains a comprehensive technical-indicators library (`src.indicators`): SMA / EMA / WMA / VWMA, RSI, MACD, Stochastic, Williams %R, CCI, ROC, ATR (SMA/EMA/Wilder smoothings), Bollinger, Keltner, Donchian, OBV, anchored VWAP, Chaikin A/D
+- generates trading signals using seven strategy templates: momentum, mean reversion, Donchian breakout, EMA crossover, MACD, pairs (cointegration), and adaptive (regime-based)
 - combines multiple strategies via majority vote, weighted sum or unanimous-consent ensemble combiners
 - detects market regimes (trending vs mean-reverting) using ADX and Hurst exponent
-- applies a cost-aware backtest with transaction costs and volatility targeting
+- runs **vectorised** backtests with transaction costs, volatility targeting and a risk middleware (stop-loss, take-profit, trailing stop, position limits, daily loss limit)
+- runs **event-driven** backtests through a full OMS — MARKET / LIMIT / STOP / STOP_LIMIT orders, DAY / GTC / IOC / FOK TIF, intrabar limit matching, gap-safe stop fills, partial fills, weighted-avg cost basis, realized vs unrealized PnL splits
 - models realistic execution costs (bid-ask spread + square-root market impact + fixed commission)
-- enforces risk management rules (stop-loss, take-profit, trailing stop, position limits, daily loss limit)
 - offers position-sizing helpers: fractional Kelly, ATR-based and fixed-fractional sizing
-- runs walk-forward validation to test strategy robustness (rolling IS/OOS)
-- runs Monte Carlo robustness analysis (bootstrap and trade-shuffle) for confidence intervals
-- runs statistical significance tests on Sharpe (t-test, Probabilistic SR, Deflated SR for selection-bias correction)
-- aggregates single-asset strategies into a multi-asset portfolio (equal-weight, inverse-vol, custom, min-variance, max-Sharpe, or risk-parity weights)
+- exposes a `Broker` interface with a `PaperBroker` implementation that shares the same OMS — a clean seam for future IB / Alpaca / Binance adapters
+- computes **20+ performance metrics** including Sharpe, Sortino, Calmar, CAGR, max drawdown, **Value-at-Risk** (historical / parametric), **Conditional VaR**, **Omega ratio**, **Ulcer Index**, **gain-to-pain**, **drawdown duration & recovery time**, **tail ratio**, **downside/upside deviation**, **rolling beta vs benchmark**
+- runs walk-forward validation, Monte Carlo bootstrap, trade-shuffle robustness and statistical Sharpe significance tests (t-test, Probabilistic SR, **Deflated SR** for multiple-testing correction)
+- aggregates single-asset strategies into a multi-asset portfolio (equal-weight, inverse-vol, custom, min-variance, max-Sharpe, or risk-parity weights via Maillard-Roncalli-Teïletche cyclical descent)
 - runs factor / attribution regression to separate alpha from passive factor exposure
-- generates multi-panel tear-sheet reports (equity, drawdown, rolling Sharpe, monthly heatmap, distribution)
-- computes trade-level analytics (win rate, profit factor, expectancy, streaks, payoff ratio)
-- builds equity curves and saves them as plots
-- calculates performance statistics (Sharpe, Sortino, Calmar, CAGR, Max Drawdown)
+- generates multi-panel tear-sheet reports (equity, drawdown, rolling Sharpe, monthly heatmap, distribution, metrics table)
 - exports trade logs and parameter sweep results
-- ships an end-to-end `examples/full_demo.py` and GitHub Actions CI workflow
+- ships an end-to-end `examples/full_demo.py` and a GitHub Actions CI workflow
 
 ## Project structure
 
@@ -35,8 +69,17 @@ trading_system/
 ├── src/
 │   ├── data/
 │   │   ├── loader.py              # Yahoo Finance data download
-│   │   └── csv_loader.py          # Local CSV OHLCV loader (offline / custom data)
+│   │   ├── csv_loader.py          # Local CSV OHLCV loader (offline / custom data)
+│   │   ├── cache.py               # Parquet-backed loader cache
+│   │   ├── resample.py            # OHLCV bar aggregation (1m -> 1D, etc.)
+│   │   └── universe.py            # FAANG / Dow30 / sectors / benchmarks / factors
+│   ├── indicators/                # Comprehensive vectorised TA library
+│   │   ├── trend.py               # SMA / EMA / WMA / VWMA
+│   │   ├── momentum.py            # RSI / MACD / Stochastic / Williams %R / CCI / ROC
+│   │   ├── volatility.py          # ATR / Bollinger / Keltner / Donchian
+│   │   └── volume.py              # OBV / VWAP (anchored) / Chaikin A/D
 │   ├── strategy/
+│   │   ├── base.py                # Abstract Strategy class + SmaCrossover example
 │   │   ├── momentum.py            # Momentum signal generator
 │   │   ├── mean_reversion.py      # Bollinger Bands + RSI strategy
 │   │   ├── breakout.py            # Donchian channel breakout (turtle-style)
@@ -44,12 +87,20 @@ trading_system/
 │   │   ├── pairs.py               # Cointegration-based pairs trading
 │   │   └── ensemble.py            # Majority / weighted / unanimous combiners
 │   ├── backtest/
-│   │   └── engine.py              # Cost-aware backtest engine
+│   │   ├── engine.py              # Vectorised cost-aware backtest engine
+│   │   └── event_engine.py        # Event-driven engine with full OMS
+│   ├── oms/                       # Order Management System
+│   │   ├── order.py               # Order / OrderStatus / OrderType / Side / TIF
+│   │   ├── position.py            # Per-symbol position with cost basis + PnL
+│   │   └── portfolio.py           # Cash + positions + equity history
+│   ├── live/
+│   │   └── broker.py              # Broker interface + PaperBroker implementation
 │   ├── execution/
 │   │   └── slippage.py            # Spread + sqrt-impact execution model
 │   ├── risk/
-│   │   ├── manager.py             # Risk management controls
-│   │   └── sizing.py              # Kelly / ATR / fixed-fractional sizing
+│   │   ├── manager.py             # Risk management middleware
+│   │   ├── sizing.py              # Kelly / ATR / fixed-fractional sizing
+│   │   └── metrics.py             # VaR / CVaR / Omega / Ulcer / drawdown stats / rolling beta
 │   ├── regime/
 │   │   └── detector.py            # Market regime detection (ADX + Hurst)
 │   ├── validation/
@@ -87,6 +138,13 @@ trading_system/
 │   ├── test_pairs.py              # Pairs trading / cointegration tests
 │   ├── test_ensemble.py           # Signal-ensemble tests
 │   ├── test_stat_tests.py         # Sharpe significance / DSR tests
+│   ├── test_oms.py                # OMS: Order / Position / Portfolio tests
+│   ├── test_event_engine.py       # Event-driven engine tests
+│   ├── test_strategy_base.py      # Strategy ABC + SmaCrossover tests
+│   ├── test_indicators.py         # Indicators library tests
+│   ├── test_risk_metrics.py       # VaR / CVaR / Omega / drawdown tests
+│   ├── test_data_extras.py        # Cache / resample / universe tests
+│   ├── test_live_broker.py        # PaperBroker tests
 │   └── test_engine.py             # Backtest engine tests
 ├── examples/
 │   └── full_demo.py               # End-to-end demo touching every module
@@ -302,6 +360,79 @@ CLI flags: `--stop-loss`, `--take-profit`, `--trailing-stop`, `--max-position`, 
 
 All helpers return a position fraction in `[0, cap]` and degrade gracefully (return `0.0`) when the edge is non-positive.
 
+## Event-driven backtesting
+
+The vectorised engine is fast, but it operates on signal series and can't model order types, partial fills, or intrabar dynamics. For execution-realistic simulation use the event-driven engine in `src.backtest.event_engine`:
+
+```python
+from src.backtest.event_engine import EventEngine
+from src.strategy.base import SmaCrossoverStrategy
+
+eng = EventEngine(
+    symbol="SPY", initial_cash=100_000,
+    commission_per_share=0.005, commission_min=1.0,
+    slippage_bps=2.0,
+)
+result = eng.run(ohlcv_df, SmaCrossoverStrategy(fast=20, slow=50, trade_qty=100))
+
+print(result.portfolio.cash)                # remaining cash
+print(result.portfolio.positions["SPY"])    # cost basis + realized PnL
+print(result.equity_curve.tail())
+print(result.fills.head())
+```
+
+Supported order types:
+
+| Type         | Fill rule                                                                                        |
+|--------------|--------------------------------------------------------------------------------------------------|
+| `MARKET`     | Next bar's open                                                                                  |
+| `LIMIT`      | Fills if the bar's range crosses `limit_price` (gap-protected for sells / buys at open)         |
+| `STOP`       | Triggers when the bar's high (buy) or low (sell) breaches `stop_price`; fills at worse of stop/open |
+| `STOP_LIMIT` | Triggers like a STOP, then behaves like a LIMIT until expiry                                     |
+
+Time-in-force `DAY`, `GTC`, `IOC`, `FOK` are modelled. Commissions and slippage are charged per fill; the OMS tracks weighted-avg cost basis per symbol and separates realised vs unrealised PnL.
+
+### Writing event-driven strategies
+
+Subclass `Strategy` and implement `on_bar(ctx)`:
+
+```python
+from src.strategy.base import Strategy
+from src.oms import Side
+from src.indicators import sma
+
+class RsiMeanReversion(Strategy):
+    def __init__(self, period=14, oversold=30, qty=10):
+        self.period = period
+        self.oversold = oversold
+        self.qty = qty
+
+    def on_bar(self, ctx):
+        from src.indicators import rsi
+        r = rsi(ctx.history["close"], self.period).iloc[-1]
+        pos = ctx.portfolio.get_position(ctx.symbol)
+        if r < self.oversold and pos.is_flat:
+            ctx.submit_order(Side.BUY, self.qty)
+        elif r > 50 and pos.is_long:
+            ctx.submit_order(Side.SELL, pos.quantity)
+```
+
+### Paper broker
+
+`src.live.broker.PaperBroker` shares the same OMS as the event engine, so paper-traded strategies port to a future live broker by swapping one constructor:
+
+```python
+from src.live.broker import PaperBroker
+from src.oms import Order, Side, OrderType
+
+bk = PaperBroker(initial_cash=100_000, commission_per_share=0.005)
+bk.submit_order(Order(symbol="SPY", side=Side.BUY, quantity=100), mark_price=412.50)
+bk.poll({"SPY": 415.10})        # re-evaluate working LIMIT/STOP orders
+print(bk.equity({"SPY": 415.10}))
+```
+
+The roadmap for real-broker adapters (Interactive Brokers, Alpaca, Binance) is to subclass `Broker` and implement the same six methods.
+
 ## Execution / slippage model
 
 `src/execution/slippage.py` replaces the engine's flat `transaction_cost` with a reduced-form model that captures the qualitative shape of real-world execution costs:
@@ -433,7 +564,7 @@ Trade stats are printed automatically after each backtest run and are included i
 
 ## Performance metrics
 
-Portfolio-level metrics computed from the daily return series:
+Core portfolio-level metrics computed from the daily return series:
 
 - **Total Return** — cumulative return over the period
 - **CAGR** — compound annual growth rate
@@ -441,6 +572,58 @@ Portfolio-level metrics computed from the daily return series:
 - **Sortino Ratio** — downside-risk-adjusted return
 - **Max Drawdown** — largest peak-to-trough decline
 - **Calmar Ratio** — CAGR divided by max drawdown
+
+### Advanced risk metrics
+
+`src/risk/metrics.py` adds a deep bench of professional-grade risk statistics:
+
+- **`historical_var(returns, level)`** — empirical Value-at-Risk at the chosen confidence.
+- **`historical_cvar(returns, level)`** — expected shortfall conditional on breaching VaR (always ≥ VaR).
+- **`parametric_var(returns, level)`** — Gaussian VaR for sanity-checking against the historical estimate.
+- **`omega_ratio(returns, target_return)`** — gains-above-target / losses-below-target.
+- **`ulcer_index(returns)`** — RMS percentage drawdown, capturing both depth and persistence.
+- **`gain_to_pain_ratio(returns)`** — daily-returns profit factor.
+- **`drawdown_stats(returns)`** — depth, start/end/recovery dates, duration and recovery time in days.
+- **`downside_deviation` / `upside_deviation`** — annualised one-sided volatility.
+- **`tail_ratio(returns, level)`** — right-tail / left-tail magnitude ratio.
+- **`common_ratio(returns)`** — CAGR / annualised vol (compound-return Sharpe variant).
+- **`rolling_beta(strategy, benchmark, window)`** — time-varying beta vs a benchmark.
+
+## Indicators library
+
+`src/indicators` is the single source of truth for technical indicators across strategies and the event engine. All are pure pandas / numpy with consistent API:
+
+| Family       | Indicators                                                                       |
+|--------------|----------------------------------------------------------------------------------|
+| Trend        | `sma`, `ema`, `wma`, `vwma`                                                      |
+| Momentum     | `rsi`, `macd`, `stochastic`, `williams_r`, `cci`, `roc`                          |
+| Volatility   | `atr` (sma/ema/wilder), `bollinger`, `keltner`, `donchian`                       |
+| Volume       | `obv`, `vwap` (anchored), `chaikin_ad`                                           |
+
+```python
+from src.indicators import rsi, bollinger, atr, vwap
+
+rsi14 = rsi(df["close"], period=14)
+bb = bollinger(df["close"], window=20, num_std=2.0)
+atr14 = atr(df["high"], df["low"], df["close"], period=14, smoothing="wilder")
+vw = vwap(df["close"], df["volume"], anchor="D")
+```
+
+## Data layer
+
+- **`load_yahoo_ohlcv` / `load_csv_ohlcv`** — primary downloaders.
+- **`CachedLoader`** — drop-in wrapper that persists downloaded frames to `~/.trading_system_cache/` (parquet preferred, CSV fallback) so repeat backtests don't hit the network.
+- **`resample_ohlcv` / `to_daily` / `to_weekly` / `to_monthly`** — aggregate intraday bars (open=first, high=max, low=min, close=last, volume=sum).
+- **`get_universe(name)`** — pre-defined baskets: `faang`, `faang_plus`, `dow30`, `sectors`, `benchmarks`, `factors`.
+
+```python
+from src.data import load_yahoo_ohlcv
+from src.data.cache import CachedLoader
+from src.data.universe import get_universe
+
+loader = CachedLoader(load_yahoo_ohlcv)
+basket = {t: loader(t, start="2015-01-01") for t in get_universe("sectors")}
+```
 
 ## Parameter sweep
 
@@ -454,7 +637,15 @@ Results are saved to `results/sweep_results.csv` and the top 10 configurations a
 
 ## Limitations
 
-This is a research prototype, not a production trading system. Current limitations include Yahoo Finance data only, simplified regime detection (not a hidden Markov model), execution-cost model that is reduced-form (no order-book simulation, no queue position), portfolio optimisers that clip negative weights rather than solving a constrained QP, and Monte Carlo resampling that assumes returns are stationary.
+The codebase is research-grade — it ships the architecture and components of a professional trading stack, but is not a production execution venue. Current limitations:
+
+- Default data source is Yahoo Finance (free, end-of-day quality).
+- Regime detection uses ADX + Hurst rather than a hidden Markov model.
+- Execution-cost model is reduced-form: spread + sqrt-impact + commission. No order-book simulation, no queue position, no cross-venue routing.
+- Portfolio optimisers clip negative weights and renormalise rather than solving a constrained QP (sufficient for research baskets but not for institutional sizing).
+- Monte Carlo resampling assumes stationary returns (use block bootstrap for short-range autocorrelation).
+- The paper broker fills synchronously at the supplied mark — real broker adapters (IB / Alpaca / Binance) are stubbed only at the interface level.
+- Event engine is single-asset per run; multi-asset event-driven backtesting is left as future work.
 
 ## Tech stack
 
