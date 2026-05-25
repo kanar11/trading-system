@@ -8,8 +8,9 @@ This project demonstrates a full research workflow: data ingestion, signal gener
 
 The system currently:
 
-- downloads historical OHLCV data using `yfinance` (any ticker)
-- generates trading signals using four strategies: momentum, mean reversion, Donchian breakout, and adaptive (regime-based)
+- downloads historical OHLCV data using `yfinance` (any ticker) or loads from local CSV
+- generates trading signals using seven strategies: momentum, mean reversion, Donchian breakout, EMA crossover, MACD, pairs (cointegration), and adaptive (regime-based)
+- combines multiple strategies via majority vote, weighted sum or unanimous-consent ensemble combiners
 - detects market regimes (trending vs mean-reverting) using ADX and Hurst exponent
 - applies a cost-aware backtest with transaction costs and volatility targeting
 - models realistic execution costs (bid-ask spread + square-root market impact + fixed commission)
@@ -17,6 +18,7 @@ The system currently:
 - offers position-sizing helpers: fractional Kelly, ATR-based and fixed-fractional sizing
 - runs walk-forward validation to test strategy robustness (rolling IS/OOS)
 - runs Monte Carlo robustness analysis (bootstrap and trade-shuffle) for confidence intervals
+- runs statistical significance tests on Sharpe (t-test, Probabilistic SR, Deflated SR for selection-bias correction)
 - aggregates single-asset strategies into a multi-asset portfolio (equal-weight, inverse-vol, custom, min-variance, max-Sharpe, or risk-parity weights)
 - runs factor / attribution regression to separate alpha from passive factor exposure
 - generates multi-panel tear-sheet reports (equity, drawdown, rolling Sharpe, monthly heatmap, distribution)
@@ -24,6 +26,7 @@ The system currently:
 - builds equity curves and saves them as plots
 - calculates performance statistics (Sharpe, Sortino, Calmar, CAGR, Max Drawdown)
 - exports trade logs and parameter sweep results
+- ships an end-to-end `examples/full_demo.py` and GitHub Actions CI workflow
 
 ## Project structure
 
@@ -31,11 +34,15 @@ The system currently:
 trading_system/
 ├── src/
 │   ├── data/
-│   │   └── loader.py              # Yahoo Finance data download
+│   │   ├── loader.py              # Yahoo Finance data download
+│   │   └── csv_loader.py          # Local CSV OHLCV loader (offline / custom data)
 │   ├── strategy/
 │   │   ├── momentum.py            # Momentum signal generator
 │   │   ├── mean_reversion.py      # Bollinger Bands + RSI strategy
-│   │   └── breakout.py            # Donchian channel breakout (turtle-style)
+│   │   ├── breakout.py            # Donchian channel breakout (turtle-style)
+│   │   ├── ema_crossover.py       # Fast/slow EMA and MACD crossover signals
+│   │   ├── pairs.py               # Cointegration-based pairs trading
+│   │   └── ensemble.py            # Majority / weighted / unanimous combiners
 │   ├── backtest/
 │   │   └── engine.py              # Cost-aware backtest engine
 │   ├── execution/
@@ -47,7 +54,8 @@ trading_system/
 │   │   └── detector.py            # Market regime detection (ADX + Hurst)
 │   ├── validation/
 │   │   ├── walk_forward.py        # Walk-forward validation framework
-│   │   └── monte_carlo.py         # Bootstrap + trade-shuffle robustness
+│   │   ├── monte_carlo.py         # Bootstrap + trade-shuffle robustness
+│   │   └── stat_tests.py          # Sharpe t-test, Probabilistic & Deflated SR
 │   ├── portfolio/
 │   │   ├── portfolio.py           # Multi-asset portfolio backtest
 │   │   └── optimizer.py           # Min-variance / max-Sharpe / risk-parity weights
@@ -74,7 +82,16 @@ trading_system/
 │   ├── test_execution.py          # Execution-cost model tests
 │   ├── test_tearsheet.py          # Tear-sheet generator tests
 │   ├── test_attribution.py        # Factor attribution tests
+│   ├── test_csv_loader.py         # CSV loader tests
+│   ├── test_ema_crossover.py      # EMA / MACD strategy tests
+│   ├── test_pairs.py              # Pairs trading / cointegration tests
+│   ├── test_ensemble.py           # Signal-ensemble tests
+│   ├── test_stat_tests.py         # Sharpe significance / DSR tests
 │   └── test_engine.py             # Backtest engine tests
+├── examples/
+│   └── full_demo.py               # End-to-end demo touching every module
+├── .github/workflows/
+│   └── test.yml                   # CI: pytest on Python 3.11 + 3.12
 ├── main.py                        # Main pipeline entry point (CLI)
 ├── grid_search.py                 # Grid search script
 ├── plot_heatmap.py                # Heatmap visualisation
@@ -119,8 +136,29 @@ python main.py --strategy mean-reversion --ticker AAPL
 # adaptive (regime-based) strategy
 python main.py --strategy adaptive
 
-# custom momentum parameters
-python main.py --lookback 100 --threshold 0.01 --no-sma-filter
+# Donchian breakout on QQQ
+python main.py --strategy breakout --ticker QQQ --bo-entry 30 --bo-exit 10
+
+# EMA crossover
+python main.py --strategy ema-cross --ema-fast 20 --ema-slow 100
+
+# MACD
+python main.py --strategy macd
+
+# load OHLCV from a local CSV instead of yfinance
+python main.py --csv data/spy.csv
+
+# realistic execution costs (spread + sqrt-impact) instead of flat --cost
+python main.py --execution-model --spread-bps 5 --impact-coeff 0.1
+
+# add Monte Carlo bootstrap on the daily return series
+python main.py --monte-carlo 1000 --mc-block-size 5
+
+# emit a multi-panel tearsheet PNG
+python main.py --tearsheet
+
+# Deflated Sharpe correcting for 100 parameter trials
+python main.py --n-trials 100
 
 # walk-forward validation
 python main.py --walk-forward
@@ -133,6 +171,9 @@ python main.py --no-risk
 
 # verbose logging
 python main.py -v
+
+# end-to-end demo of every module on synthetic data (no network needed)
+python examples/full_demo.py
 ```
 
 ### 4. Run tests
@@ -189,6 +230,40 @@ python main.py --strategy adaptive --adx-threshold 25 --hurst-window 100
 ```
 
 Key parameters: `--adx-period`, `--adx-threshold`, `--hurst-window`.
+
+### EMA / MACD crossover
+
+Two classical trend-following baselines sharing the same EMA primitive. The EMA crossover compares a fast and slow EMA with an optional flat-zone gap to suppress signal churn. The MACD variant uses the standard (12, 26, 9) configuration of MACD line vs signal line.
+
+```bash
+python main.py --strategy ema-cross --ema-fast 20 --ema-slow 100 --ema-gap-bps 10
+python main.py --strategy macd --macd-fast 12 --macd-slow 26 --macd-signal 9
+```
+
+### Pairs trading (cointegration)
+
+Stat-arb on two cointegrated price series. Engle-Granger test fits a hedge ratio by OLS, runs an Augmented Dickey-Fuller test on the residuals, and only allows trading when the residual is stationary at 5%. The spread is then z-scored on a rolling window and traded back to the mean.
+
+```python
+from src.strategy.pairs import pairs_trading_signal
+
+signals = pairs_trading_signal(
+    coca_cola_close, pepsi_close,
+    z_window=60, z_entry=2.0, z_exit=0.5,
+)
+```
+
+Returns a single-asset DataFrame compatible with the standard backtest engine (the spread is published as the `close` column).
+
+### Signal ensemble
+
+Combine multiple strategies into a single signal series in `src/strategy/ensemble.py`:
+
+- **`majority_vote(signals)`** — sign of the row sum, ties → flat. Most robust to a misbehaving member.
+- **`weighted_sum(signals, weights, threshold)`** — weighted average sign-thresholded. Useful when one strategy has higher conviction.
+- **`unanimous(signals)`** — take a position only if every strategy agrees. Trades less often but with higher per-trade conviction.
+
+All combiners take a wide-format DataFrame whose columns are individual `{-1, 0, +1}` signal series.
 
 ## Regime detection
 
@@ -265,6 +340,16 @@ Walk-forward measures degradation across time; Monte Carlo measures degradation 
 - **`shuffle_trade_log(trade_returns, n_simulations)`** — permutes the order of completed trades without replacement. The set of trades is identical to the original, so this isolates path-dependence: a wide spread in max drawdown across permutations suggests the in-sample drawdown is partly an ordering artefact.
 
 Both return a `MonteCarloResult` with per-simulation metrics and a mean / std / 5%/50%/95% summary table. Use `print_monte_carlo_report(result)` for a formatted dump.
+
+## Sharpe significance & Deflated SR
+
+`src/validation/stat_tests.py` adds three significance tests that go beyond a point-estimate Sharpe ratio:
+
+- **`sharpe_ttest(returns)`** — classical Sharpe-ratio t-test under iid normal returns. Reports annualised Sharpe, t-stat and two-sided p-value.
+- **`probabilistic_sharpe_ratio(returns, target_sharpe)`** — Bailey & López de Prado (2012) probability that the true Sharpe exceeds the target, with skew / excess-kurtosis corrections. Returns a value in `[0, 1]`.
+- **`deflated_sharpe_ratio(returns, n_trials)`** — same idea but inflates the target Sharpe to account for the *best of N* parameter trials. The right answer to "I tried 200 parameter combinations and the best one looks great — is that real?" is almost never the raw PSR.
+
+Both PSR and DSR are pure-Python (no scipy): they use the standard-library `math.erf` for the normal CDF and an Acklam-2003 rational approximation for its inverse.
 
 ## Multi-asset portfolio
 

@@ -130,7 +130,7 @@ def run_walk_forward(
         full_window = df.iloc[is_start:oos_end].copy()
 
         logger.info(
-            "Fold %d: IS [%s → %s] OOS [%s → %s]",
+            "Fold %d: IS [%s -> %s] OOS [%s -> %s]",
             fold_num,
             df.index[is_start].strftime("%Y-%m-%d"),
             df.index[is_end - 1].strftime("%Y-%m-%d"),
@@ -229,7 +229,7 @@ def print_walk_forward_report(results: dict) -> None:
     print(f"\n{'Fold':>4}  {'OOS Period':<25}  {'Sharpe':>8}  {'Return':>8}  {'MaxDD':>8}  {'Trades':>6}")
     print("-" * 70)
     for f in results["folds"]:
-        period = f"{f.oos_start} → {f.oos_end}"
+        period = f"{f.oos_start} -> {f.oos_end}"
         print(
             f"{f.fold:>4}  {period:<25}  "
             f"{f.oos_metrics['Sharpe Ratio']:>8.2f}  "
@@ -255,7 +255,7 @@ def print_walk_forward_report(results: dict) -> None:
     print(f"  Degradation:       {d['sharpe_degradation_pct']:.1f}%")
 
     if d["sharpe_degradation_pct"] > 50:
-        print("  [!] High degradation — strategy may be overfitting in-sample data.")
+        print("  [!] High degradation - strategy may be overfitting in-sample data.")
     elif d["sharpe_degradation_pct"] < 20:
         print("  Strategy shows good robustness across folds.")
 

@@ -19,16 +19,27 @@ from functools import partial
 import matplotlib.pyplot as plt
 
 from src.data.loader import load_yahoo_ohlcv
+from src.data.csv_loader import load_csv_ohlcv
 from src.strategy.momentum import momentum_strategy
 from src.strategy.mean_reversion import mean_reversion_strategy
+from src.strategy.breakout import breakout_strategy
+from src.strategy.ema_crossover import ema_crossover_strategy, macd_strategy
 from src.backtest.engine import backtest_strategy
+from src.execution.slippage import ExecutionConfig, apply_execution_costs
 from src.reporting.metrics import calculate_metrics, calculate_trade_stats
+from src.reporting.tearsheet import generate_tearsheet
 from src.risk.manager import RiskConfig, summarise_risk_events
 from src.regime.detector import adaptive_strategy, RegimeConfig
 from src.validation.walk_forward import (
     WalkForwardConfig,
     run_walk_forward,
     print_walk_forward_report,
+)
+from src.validation.monte_carlo import bootstrap_returns, print_monte_carlo_report
+from src.validation.stat_tests import (
+    sharpe_ttest,
+    probabilistic_sharpe_ratio,
+    deflated_sharpe_ratio,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,12 +54,17 @@ def parse_args() -> argparse.Namespace:
     # data
     parser.add_argument("--ticker", default="SPY", help="Yahoo Finance symbol (default: SPY)")
     parser.add_argument("--start", default="2010-01-01", help="Start date YYYY-MM-DD (default: 2010-01-01)")
+    parser.add_argument(
+        "--csv", default=None,
+        help="Load OHLCV from a local CSV instead of Yahoo Finance.",
+    )
 
     # strategy selection
     parser.add_argument(
-        "--strategy", choices=["momentum", "mean-reversion", "adaptive"],
+        "--strategy",
+        choices=["momentum", "mean-reversion", "adaptive", "breakout", "ema-cross", "macd"],
         default="momentum",
-        help="Strategy type: momentum, mean-reversion, or adaptive (default: momentum)",
+        help="Strategy type (default: momentum)",
     )
 
     # momentum params
@@ -69,6 +85,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--adx-threshold", type=float, default=25.0, help="ADX trending threshold (default: 25)")
     parser.add_argument("--hurst-window", type=int, default=100, help="Hurst exponent window (default: 100)")
 
+    # breakout params
+    parser.add_argument("--bo-entry", type=int, default=20, help="Donchian entry window (default: 20)")
+    parser.add_argument("--bo-exit", type=int, default=10, help="Donchian exit window (default: 10)")
+    parser.add_argument("--bo-atr-filter", type=float, default=0.0, help="Breakout size in ATR units (default: 0 = off)")
+
+    # EMA / MACD params
+    parser.add_argument("--ema-fast", type=int, default=20, help="Fast EMA span (default: 20)")
+    parser.add_argument("--ema-slow", type=int, default=50, help="Slow EMA span (default: 50)")
+    parser.add_argument("--ema-gap-bps", type=float, default=0.0, help="EMA spread gap in bps (default: 0)")
+    parser.add_argument("--macd-fast", type=int, default=12, help="MACD fast span (default: 12)")
+    parser.add_argument("--macd-slow", type=int, default=26, help="MACD slow span (default: 26)")
+    parser.add_argument("--macd-signal", type=int, default=9, help="MACD signal span (default: 9)")
+
     # vol targeting
     parser.add_argument("--vol-target", type=float, default=0.15, help="Annualised vol target (default: 0.15)")
     parser.add_argument("--vol-window", type=int, default=20, help="Realised vol window (default: 20)")
@@ -88,9 +117,22 @@ def parse_args() -> argparse.Namespace:
 
     # costs
     parser.add_argument("--cost", type=float, default=0.001, help="Transaction cost (default: 0.001)")
+    parser.add_argument(
+        "--execution-model", action="store_true",
+        help="Replace flat --cost with realistic spread + sqrt-impact model.",
+    )
+    parser.add_argument("--spread-bps", type=float, default=5.0, help="Bid-ask spread bps (default: 5)")
+    parser.add_argument("--impact-coeff", type=float, default=0.1, help="Market impact coefficient (default: 0.1)")
+    parser.add_argument("--impact-exponent", type=float, default=0.5, help="Market impact exponent (default: 0.5 = sqrt)")
+
+    # robustness
+    parser.add_argument("--monte-carlo", type=int, default=0, help="Run N bootstrap MC simulations on the return series.")
+    parser.add_argument("--mc-block-size", type=int, default=1, help="Bootstrap block size (1 = i.i.d., >1 = moving block).")
+    parser.add_argument("--n-trials", type=int, default=1, help="For Deflated Sharpe Ratio — number of parameter trials run.")
 
     # output
     parser.add_argument("--output-dir", default="results", help="Output directory (default: results)")
+    parser.add_argument("--tearsheet", action="store_true", help="Generate a multi-panel PNG tearsheet.")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable debug logging")
 
     return parser.parse_args()
@@ -136,10 +178,30 @@ def _build_strategy_fn(args: argparse.Namespace):
             mean_reversion_fn=mr_fn,
             config=regime_config,
         )
-    elif args.strategy == "mean-reversion":
+    if args.strategy == "mean-reversion":
         return mr_fn
-    else:
-        return mom_fn
+    if args.strategy == "breakout":
+        return partial(
+            breakout_strategy,
+            entry_window=args.bo_entry,
+            exit_window=args.bo_exit,
+            atr_filter=args.bo_atr_filter,
+        )
+    if args.strategy == "ema-cross":
+        return partial(
+            ema_crossover_strategy,
+            fast=args.ema_fast,
+            slow=args.ema_slow,
+            gap_bps=args.ema_gap_bps,
+        )
+    if args.strategy == "macd":
+        return partial(
+            macd_strategy,
+            fast=args.macd_fast,
+            slow=args.macd_slow,
+            signal_span=args.macd_signal,
+        )
+    return mom_fn
 
 
 def _build_backtest_fn(args: argparse.Namespace, risk_config: RiskConfig | None):
@@ -169,8 +231,12 @@ def main() -> None:
         )
 
     # --- load data ---
-    logger.info("Loading %s data from %s...", args.ticker, args.start)
-    df = load_yahoo_ohlcv(ticker=args.ticker, start=args.start)
+    if args.csv is not None:
+        logger.info("Loading OHLCV from CSV: %s", args.csv)
+        df = load_csv_ohlcv(args.csv, start=args.start)
+    else:
+        logger.info("Loading %s data from %s...", args.ticker, args.start)
+        df = load_yahoo_ohlcv(ticker=args.ticker, start=args.start)
     logger.info("Loaded %d rows.", len(df))
 
     strategy_fn = _build_strategy_fn(args)
@@ -210,6 +276,16 @@ def main() -> None:
 
     logger.info("Running backtest...")
     backtest_df, trade_log = backtest_fn(strategy_df)
+
+    # --- optional realistic execution model ---
+    if args.execution_model:
+        logger.info("Applying realistic execution-cost model.")
+        exec_cfg = ExecutionConfig(
+            spread_bps=args.spread_bps,
+            impact_coeff=args.impact_coeff,
+            impact_exponent=args.impact_exponent,
+        )
+        backtest_df = apply_execution_costs(backtest_df, exec_cfg)
 
     # --- metrics ---
     metrics = calculate_metrics(backtest_df["strategy_returns"])
@@ -256,6 +332,29 @@ def main() -> None:
     else:
         print("  No trades found.")
 
+    # --- statistical significance ---
+    sr_test = sharpe_ttest(backtest_df["strategy_returns"])
+    psr = probabilistic_sharpe_ratio(backtest_df["strategy_returns"], target_sharpe=0.0)
+    dsr = deflated_sharpe_ratio(
+        backtest_df["strategy_returns"], n_trials=args.n_trials
+    )
+    print("\n=== Sharpe Significance ===")
+    print(f"  Annualised Sharpe:    {sr_test.sharpe_annualised:>+7.2f}")
+    print(f"  t-stat:               {sr_test.t_stat:>+7.2f}")
+    print(f"  p-value (two-sided):  {sr_test.p_value_two_sided:>7.4f}")
+    print(f"  P(SR > 0) [PSR]:      {psr:>7.3f}")
+    print(f"  Deflated SR (trials={args.n_trials}):  {dsr:>7.3f}")
+
+    # --- Monte Carlo ---
+    if args.monte_carlo > 0:
+        logger.info("Running %d-iteration Monte Carlo bootstrap...", args.monte_carlo)
+        mc_result = bootstrap_returns(
+            backtest_df["strategy_returns"],
+            n_simulations=args.monte_carlo,
+            block_size=args.mc_block_size,
+        )
+        print_monte_carlo_report(mc_result, title="Bootstrap Monte Carlo")
+
     # --- save outputs ---
     output_dir = Path(args.output_dir)
     output_dir.mkdir(exist_ok=True)
@@ -283,6 +382,19 @@ def main() -> None:
     fig.savefig(equity_plot_file, dpi=150)
     plt.close(fig)
     logger.info("Saved: %s", equity_plot_file)
+
+    # --- optional tearsheet ---
+    if args.tearsheet:
+        ts_path = output_dir / f"tearsheet_{args.ticker.lower()}_{strat_tag}.png"
+        ts_fig = generate_tearsheet(
+            backtest_df["strategy_returns"],
+            benchmark=backtest_df["buy_hold_returns"],
+            trade_log=trade_log,
+            output_path=ts_path,
+            title=f"{args.ticker} {strategy_label} tearsheet",
+        )
+        plt.close(ts_fig)
+        logger.info("Saved tearsheet: %s", ts_path)
 
     # summary table
     print("\n=== Backtest Data (last 10 rows) ===")

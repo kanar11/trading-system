@@ -74,7 +74,7 @@ def generate_tearsheet(
     """
     returns = returns.dropna()
     if returns.empty:
-        raise ValueError("returns is empty — nothing to plot")
+        raise ValueError("returns is empty - nothing to plot")
 
     metrics = calculate_metrics(returns)
     trade_stats = calculate_trade_stats(trade_log) if trade_log is not None else None
