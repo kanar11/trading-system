@@ -170,7 +170,7 @@ def shuffle_trade_log(
 def print_monte_carlo_report(result: MonteCarloResult, title: str = "Monte Carlo") -> None:
     """Pretty-print a Monte-Carlo summary table."""
     print("\n" + "=" * 60)
-    print(f"{title} — {result.n_simulations} simulations")
+    print(f"{title} - {result.n_simulations} simulations")
     print("=" * 60)
     formatted = result.summary.copy()
     for col in formatted.columns:

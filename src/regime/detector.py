@@ -170,7 +170,7 @@ def detect_regime(
     else:
         # fallback: use close-based proxy for trend strength
         # (absolute return over period, normalised)
-        logger.info("No high/low columns — using close-based trend proxy instead of ADX.")
+        logger.info("No high/low columns - using close-based trend proxy instead of ADX.")
         ret = df["close"].pct_change(config.adx_period).abs() * 100
         df["adx"] = ret.rolling(config.adx_period).mean()
 

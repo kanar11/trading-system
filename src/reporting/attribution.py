@@ -147,7 +147,7 @@ def factor_regression(
         xtx_inv = np.linalg.inv(X.T @ X)
         se = np.sqrt(np.diag(sigma2 * xtx_inv))
     except np.linalg.LinAlgError:
-        logger.warning("(X'X) is singular — t-stats set to nan")
+        logger.warning("(X'X) is singular - t-stats set to nan")
         se = np.full(p, np.nan)
 
     tstats = np.where(se > 0, coefs / se, np.nan)
@@ -174,7 +174,7 @@ def print_attribution_report(result: AttributionResult, title: str = "Factor Att
     print(f"  Alpha (annualised):  {result.alpha_annualised:>+8.2%}  (t={result.alpha_tstat:+.2f})")
     for name, beta in result.betas.items():
         t = result.beta_tstats[name]
-        print(f"  Beta — {name:<12} {beta:>+8.3f}  (t={t:+.2f})")
-    print(f"  R²:                  {result.r_squared:>8.3f}")
-    print(f"  Adj. R²:             {result.adj_r_squared:>8.3f}")
+        print(f"  Beta - {name:<12} {beta:>+8.3f}  (t={t:+.2f})")
+    print(f"  R^2:                 {result.r_squared:>8.3f}")
+    print(f"  Adj. R^2:            {result.adj_r_squared:>8.3f}")
     print("=" * 60)
