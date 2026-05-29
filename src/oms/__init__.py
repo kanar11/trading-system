@@ -1,6 +1,17 @@
 """Order management, position tracking, portfolio state."""
 
-from src.oms.order import Order, OrderStatus, OrderType, Side, TimeInForce
+from src.oms.order import (
+    Order,
+    OrderStatus,
+    OrderType,
+    Side,
+    TimeInForce,
+    RejectReason,
+    Liquidity,
+    Fill,
+    OrderError,
+    IllegalOrderTransition,
+)
 from src.oms.position import Position
 from src.oms.portfolio import Portfolio
 
@@ -10,6 +21,11 @@ __all__ = [
     "OrderType",
     "Side",
     "TimeInForce",
+    "RejectReason",
+    "Liquidity",
+    "Fill",
+    "OrderError",
+    "IllegalOrderTransition",
     "Position",
     "Portfolio",
 ]

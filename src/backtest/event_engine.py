@@ -319,7 +319,13 @@ class EventEngine:
                 fill_qty * self.commission_per_share, self.commission_min,
             ) if (self.commission_per_share > 0 or self.commission_min > 0) else 0.0
 
-            order.record_fill(fill_qty, fill_price, when=ts)
+            # LIMIT orders rest in the book → they earn the maker side;
+            # MARKET / STOP / STOP_LIMIT cross the spread → taker.
+            from src.oms import Liquidity
+            liquidity = (
+                Liquidity.MAKER if order.order_type is OrderType.LIMIT else Liquidity.TAKER
+            )
+            order.record_fill(fill_qty, fill_price, when=ts, liquidity=liquidity)
             self.portfolio.record_fill(
                 symbol=order.symbol, side=order.side, quantity=fill_qty,
                 price=fill_price, commission=commission,
@@ -328,15 +334,17 @@ class EventEngine:
     def _build_fill_log(self) -> pd.DataFrame:
         rows: list[dict] = []
         for o in self._orders:
-            for ts, qty, price in o.fills:
+            for f in o.fills:
                 rows.append(
                     {
-                        "ts": ts,
+                        "ts": f.ts,
+                        "seq": f.seq,
                         "order_id": o.order_id,
                         "symbol": o.symbol,
                         "side": o.side.value,
-                        "quantity": qty,
-                        "price": price,
+                        "quantity": f.quantity,
+                        "price": f.price,
+                        "liquidity": f.liquidity.value,
                         "tag": o.client_tag,
                     }
                 )
