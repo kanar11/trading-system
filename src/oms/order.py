@@ -46,7 +46,7 @@ Lifecycle::
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
@@ -55,6 +55,17 @@ from typing import Optional
 # non-integral sizes; this epsilon keeps "fully filled" robust against
 # binary-float representation error.
 QTY_EPSILON: float = 1e-9
+
+
+def _utc_now() -> datetime:
+    """Return the current UTC time as a *naive* datetime.
+
+    The audit log uses naive UTC end-to-end (callers in tests and the
+    paper broker pass naive datetimes), so we cannot return a tz-aware
+    value without breaking ordering comparisons. This is the
+    non-deprecated equivalent of ``datetime.utcnow()``.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class OrderError(ValueError):
@@ -337,7 +348,7 @@ class Order:
         Args:
             fill_qty: Quantity executed (> 0).
             fill_price: Execution price (> 0).
-            when: Event timestamp. Defaults to ``datetime.utcnow()``.
+            when: Event timestamp. Defaults to the current naive UTC time.
                 Must be >= the previous fill's timestamp (the audit log
                 is strictly ordered).
             liquidity: MAKER or TAKER (accepts the enum or its string).
@@ -369,7 +380,7 @@ class Order:
                 f"order {self.order_id}: cannot fill a {self.status.value} order"
             )
 
-        ts = when if when is not None else datetime.utcnow()
+        ts = when if when is not None else _utc_now()
         if self.last_fill_at is not None and ts < self.last_fill_at:
             raise ValueError(
                 f"out-of-order fill: {ts} precedes previous fill {self.last_fill_at}"

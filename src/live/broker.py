@@ -24,10 +24,18 @@ import itertools
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Mapping, Optional
 
 from src.oms import Order, OrderStatus, OrderType, Side, TimeInForce, Portfolio
+
+
+def _utc_now() -> datetime:
+    """Naive UTC ``datetime`` — non-deprecated replacement for utcnow().
+
+    Kept naive to stay consistent with the OMS audit-log timestamps.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +124,7 @@ class PaperBroker(Broker):
         """
         order.order_id = next(self._next_id)
         order.status = OrderStatus.WORKING
-        order.created_at = datetime.utcnow()
+        order.created_at = _utc_now()
         self._orders[order.order_id] = order
 
         if mark_price is None:
@@ -209,7 +217,7 @@ class PaperBroker(Broker):
         fill = BrokerFill(
             order_id=order.order_id, symbol=order.symbol, side=order.side,
             quantity=qty, price=fill_price, commission=commission,
-            when=datetime.utcnow(),
+            when=_utc_now(),
         )
         self.fills.append(fill)
         return fill
