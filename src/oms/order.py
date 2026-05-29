@@ -57,13 +57,19 @@ from typing import Optional
 QTY_EPSILON: float = 1e-9
 
 
-class OrderError(Exception):
-    """Base class for all order-related errors."""
+class OrderError(ValueError):
+    """Base class for all order-related errors.
+
+    Subclasses :class:`ValueError` because every order error ultimately
+    reports an invalid value or operation, letting callers catch the
+    domain-specific type *or* the builtin ``ValueError``.
+    """
 
 
 class IllegalOrderTransition(OrderError):
     """Raised when an order is asked to make a status change the state
-    machine forbids (e.g. filling a cancelled order)."""
+    machine forbids (e.g. filling a cancelled order or over-filling a
+    fully-filled one)."""
 
 
 class Side(str, Enum):
@@ -340,22 +346,27 @@ class Order:
             The :class:`Fill` record that was appended.
 
         Raises:
-            IllegalOrderTransition: If the order is already terminal.
-            ValueError: On non-positive size/price, over-fill, or an
-                out-of-order timestamp.
+            IllegalOrderTransition: If the order is terminal — either fully
+                filled (an over-fill) or otherwise closed (cancelled, etc.).
+                Note this subclasses ``ValueError``.
+            ValueError: On non-positive size/price or an out-of-order
+                timestamp.
         """
-        if self.status.is_terminal:
-            raise IllegalOrderTransition(
-                f"order {self.order_id}: cannot fill a {self.status.value} order"
-            )
         if fill_qty <= 0:
             raise ValueError(f"fill_qty must be > 0, got {fill_qty}")
         if fill_price <= 0:
             raise ValueError(f"fill_price must be > 0, got {fill_price}")
+        # An over-fill is checked before the generic terminal guard so that
+        # topping up a fully-filled order reports the precise "over-fill"
+        # reason rather than a bare "cannot fill a FILLED order".
         if self.filled_quantity + fill_qty > self.quantity + QTY_EPSILON:
-            raise ValueError(
-                f"fill of {fill_qty} would over-fill order "
+            raise IllegalOrderTransition(
+                f"order {self.order_id}: fill of {fill_qty} would over-fill order "
                 f"(filled {self.filled_quantity} of {self.quantity})"
+            )
+        if self.status.is_terminal:
+            raise IllegalOrderTransition(
+                f"order {self.order_id}: cannot fill a {self.status.value} order"
             )
 
         ts = when if when is not None else datetime.utcnow()
