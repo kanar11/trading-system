@@ -23,12 +23,15 @@ The system currently:
 
 ```text
 trading_system/
-├── src/
+├── quantbt/                       # Importable package (pip install -e .)
+│   ├── config.py                 # Validated RunConfig (pydantic + YAML + env)
+│   ├── cli.py                    # CLI pipeline (config-driven)
 │   ├── data/
 │   │   └── loader.py              # Yahoo Finance data download
 │   ├── strategy/
 │   │   ├── momentum.py            # Momentum signal generator
-│   │   └── mean_reversion.py      # Bollinger Bands + RSI strategy
+│   │   ├── mean_reversion.py      # Bollinger Bands + RSI strategy
+│   │   └── registry.py            # Strategy registry (@register / build_strategy)
 │   ├── backtest/
 │   │   └── engine.py              # Cost-aware backtest engine
 │   ├── risk/
@@ -42,19 +45,15 @@ trading_system/
 │       ├── plots.py               # Equity curve plotting
 │       ├── trades.py              # Trade log builder (standalone utility)
 │       └── sweep.py               # Parameter sweep runner
-├── tests/
-│   ├── conftest.py                # Shared fixtures (OHLCV, returns)
-│   ├── test_metrics.py            # Portfolio + trade-level metric tests
-│   ├── test_risk_manager.py       # Risk controls tests
-│   ├── test_momentum.py           # Momentum strategy tests
-│   ├── test_mean_reversion.py     # Mean reversion strategy tests
-│   ├── test_walk_forward.py       # Walk-forward validation tests
-│   ├── test_regime.py             # Regime detection tests
-│   └── test_engine.py             # Backtest engine tests
-├── main.py                        # Main pipeline entry point (CLI)
+├── configs/
+│   └── example.yaml               # Sample run configuration
+├── tests/                         # Pytest suite (117 tests, ~86% coverage)
+├── .github/workflows/ci.yml       # CI: ruff + mypy + pytest (py3.11/3.12)
+├── .pre-commit-config.yaml        # Pre-commit hooks (ruff, mypy, hygiene)
+├── main.py                        # Thin entry-point shim → quantbt.cli:main
 ├── grid_search.py                 # Grid search script
 ├── plot_heatmap.py                # Heatmap visualisation
-├── pyproject.toml                 # Project config and dependencies
+├── pyproject.toml                 # Project config, dependencies, tooling
 ├── requirements.txt
 └── README.md
 ```
@@ -77,44 +76,53 @@ python -m venv .venv
 .venv\Scripts\activate
 ```
 
-### 2. Install dependencies
+### 2. Install the package
 
 ```bash
-pip install -r requirements.txt
+# editable install (exposes the `quantbt-backtest` console script)
+pip install -e .
 ```
 
 ### 3. Run the project
 
+The pipeline is config-driven. A run is fully described by a `RunConfig`
+(`quantbt/config.py`): defaults < `QUANTBT_*` env vars < YAML file < CLI flags.
+The resolved config is written to `results/run_config.yaml` for reproducibility.
+
 ```bash
-# default: momentum strategy on SPY
-python main.py
+# default: momentum strategy on SPY (python main.py and quantbt-backtest are equivalent)
+quantbt-backtest
+
+# run entirely from a YAML config
+quantbt-backtest --config configs/example.yaml
+
+# YAML base with a CLI override (flags win)
+quantbt-backtest --config configs/example.yaml --ticker AAPL
 
 # mean reversion strategy on AAPL
-python main.py --strategy mean-reversion --ticker AAPL
+quantbt-backtest --strategy mean-reversion --ticker AAPL
 
 # adaptive (regime-based) strategy
-python main.py --strategy adaptive
+quantbt-backtest --strategy adaptive
 
 # custom momentum parameters
-python main.py --lookback 100 --threshold 0.01 --no-sma-filter
+quantbt-backtest --lookback 100 --threshold 0.01 --no-sma-filter
 
 # walk-forward validation
-python main.py --walk-forward
+quantbt-backtest --walk-forward --strategy mean-reversion --wf-is-days 252 --wf-oos-days 63
 
-# walk-forward with mean reversion and custom windows
-python main.py --strategy mean-reversion --walk-forward --wf-is-days 252 --wf-oos-days 63
+# override via environment variable
+QUANTBT_DATA__TICKER=QQQ quantbt-backtest
 
-# disable risk management
-python main.py --no-risk
-
-# verbose logging
-python main.py -v
+# disable risk management / verbose logging
+quantbt-backtest --no-risk -v
 ```
 
 ### 4. Run tests
 
 ```bash
-pytest tests/ -v
+pytest                                  # 117 tests
+pytest --cov=quantbt --cov-report=term-missing   # with coverage (floor: 85%)
 ```
 
 ### 5. Code quality checks
@@ -126,10 +134,14 @@ pip install -e ".[dev]"
 
 ruff check .          # lint
 ruff format --check . # formatting
-mypy src/ main.py grid_search.py plot_heatmap.py tests/  # strict type checks
+mypy quantbt main.py grid_search.py plot_heatmap.py tests  # strict type checks
+
+# optional: install git hooks so checks run automatically on commit
+pre-commit install
 ```
 
-All four checks (pytest, ruff lint, ruff format, mypy strict) are expected to
+All checks (pytest + coverage, ruff lint, ruff format, mypy strict) run in CI
+(`.github/workflows/ci.yml`) on a Python 3.11/3.12 matrix and are expected to
 pass cleanly.
 
 ## Strategies
@@ -247,7 +259,9 @@ This is a research prototype, not a production trading system. Current limitatio
 - pandas, NumPy
 - matplotlib, seaborn
 - yfinance
-- pytest, ruff, mypy (with pandas-stubs)
+- pydantic, pydantic-settings, PyYAML (typed config)
+- pytest (+ pytest-cov), ruff, mypy (with pandas-stubs), pre-commit
+- GitHub Actions CI
 
 ## Author
 
