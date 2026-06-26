@@ -182,15 +182,19 @@ class PaperBroker(Broker):
         if order.order_type is OrderType.MARKET:
             fill_price = mark
         elif order.order_type is OrderType.LIMIT:
-            if (order.side is Side.BUY and mark <= order.limit_price) or (
-                order.side is Side.SELL and mark >= order.limit_price
+            limit = order.limit_price
+            assert limit is not None  # guaranteed for LIMIT (Order.__post_init__)
+            if (order.side is Side.BUY and mark <= limit) or (
+                order.side is Side.SELL and mark >= limit
             ):
-                fill_price = order.limit_price
+                fill_price = limit
             else:
                 return None
         elif order.order_type is OrderType.STOP:
-            triggered = (order.side is Side.BUY and mark >= order.stop_price) or (
-                order.side is Side.SELL and mark <= order.stop_price
+            stop = order.stop_price
+            assert stop is not None  # guaranteed for STOP (Order.__post_init__)
+            triggered = (order.side is Side.BUY and mark >= stop) or (
+                order.side is Side.SELL and mark <= stop
             )
             if not triggered:
                 return None
@@ -209,6 +213,7 @@ class PaperBroker(Broker):
             price=fill_price,
             commission=commission,
         )
+        assert order.order_id is not None  # assigned by submit() before matching
         fill = BrokerFill(
             order_id=order.order_id,
             symbol=order.symbol,

@@ -49,5 +49,5 @@ def load_yahoo_ohlcv(ticker: str, start: str = "2015-01-01") -> pd.DataFrame:
     if missing:
         raise ValueError(f"Missing columns after download: {missing}")
 
-    df = df[REQUIRED_COLS].dropna()
-    return df
+    result: pd.DataFrame = df[REQUIRED_COLS].dropna()
+    return result

@@ -39,7 +39,8 @@ def resample_ohlcv(df: pd.DataFrame, rule: str) -> pd.DataFrame:
         raise ValueError("DataFrame must contain at least one of open/high/low/close/volume.")
 
     agg_spec = {c: _OHLCV_AGG[c] for c in cols}
-    out = df[cols].resample(rule).agg(agg_spec).dropna(how="all")
+    # pandas-stubs over-narrows .agg() and rejects a plain {col: func} mapping.
+    out = df[cols].resample(rule).agg(agg_spec).dropna(how="all")  # type: ignore[arg-type]
     return out
 
 

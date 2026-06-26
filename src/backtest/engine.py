@@ -5,6 +5,7 @@ and optional risk management controls. Produces an equity curve and trade log.
 """
 
 import logging
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -119,7 +120,9 @@ def _build_trade_log(df: pd.DataFrame) -> pd.DataFrame:
                         "entry_price": entry_price,
                         "exit_price": price,
                         "trade_return": trade_return,
-                        "holding_days": (date - entry_date).days,
+                        "holding_days": (
+                            cast("pd.Timestamp", date) - cast("pd.Timestamp", entry_date)
+                        ).days,
                     }
                 )
 

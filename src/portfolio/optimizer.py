@@ -58,8 +58,8 @@ def _clip_and_normalise(weights: np.ndarray) -> np.ndarray:
 
     Falls back to equal weights if the entire vector is non-positive.
     """
-    clipped = np.maximum(weights, 0.0)
-    total = clipped.sum()
+    clipped: np.ndarray = np.maximum(weights, 0.0)
+    total = float(clipped.sum())
     if total <= 0:
         return np.full_like(weights, 1.0 / len(weights))
     return clipped / total
@@ -118,7 +118,7 @@ def max_sharpe_weights(
         Series of weights indexed by ticker, summing to 1.
     """
     Σ = _covariance_matrix(returns, cov)
-    excess = returns.mean().values - rf_daily
+    excess = returns.mean().to_numpy() - rf_daily
 
     try:
         inv = np.linalg.inv(Σ)

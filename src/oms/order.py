@@ -45,6 +45,7 @@ Lifecycle::
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -207,7 +208,7 @@ class Fill:
     price: float
     liquidity: Liquidity = Liquidity.TAKER
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[object]:
         """Tuple-compatible unpacking: ``ts, qty, price = fill``.
 
         Preserves the historical ``(ts, quantity, price)`` shape so older

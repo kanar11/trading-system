@@ -102,7 +102,7 @@ def compute_execution_cost(
     # fixed cost is per trade, expressed already as a fraction
     fixed = np.where(active, config.fixed_cost_per_trade, 0.0)
 
-    cost = (spread + fixed) * active.astype(float) + impact
+    cost: np.ndarray = (spread + fixed) * active.astype(float) + impact
 
     if np.isscalar(trade_size):
         return float(cost)
@@ -136,7 +136,7 @@ def apply_execution_costs(
         raise ValueError("DataFrame must contain 'strategy_returns_gross'.")
 
     df = df.copy()
-    df["transaction_cost"] = compute_execution_cost(df[trade_col].values, config)
+    df["transaction_cost"] = compute_execution_cost(df[trade_col].to_numpy(), config)
     df["strategy_returns"] = df["strategy_returns_gross"] - df["transaction_cost"]
     df["equity_curve"] = (1 + df["strategy_returns"]).cumprod()
     return df

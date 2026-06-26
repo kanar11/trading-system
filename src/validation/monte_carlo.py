@@ -83,7 +83,7 @@ def bootstrap_returns(
         raise ValueError("n_simulations must be >= 1")
 
     rng = np.random.default_rng(seed)
-    values = r.values
+    values = r.to_numpy()
 
     metric_rows: list[dict[str, float]] = []
     for _ in range(n_simulations):
@@ -142,7 +142,7 @@ def shuffle_trade_log(
         raise ValueError("trade_returns series is empty")
 
     rng = np.random.default_rng(seed)
-    values = r.values
+    values = r.to_numpy()
 
     rows: list[dict[str, float]] = []
     for _ in range(n_simulations):

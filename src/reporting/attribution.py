@@ -73,8 +73,8 @@ def compute_beta(
     if len(joined) < 2:
         return 0.0
 
-    s = joined.iloc[:, 0].values
-    b = joined.iloc[:, 1].values
+    s = joined.iloc[:, 0].to_numpy()
+    b = joined.iloc[:, 1].to_numpy()
 
     var = float(np.var(b, ddof=1))
     # tolerance handles "essentially constant" benchmarks where var is
@@ -121,8 +121,8 @@ def factor_regression(
         raise ValueError(f"Need at least {k + 2} observations for {k}-factor regression, got {n}.")
 
     # design matrix with intercept column
-    X = np.column_stack([np.ones(n), df[factor_cols].values])
-    y = df["y"].values
+    X = np.column_stack([np.ones(n), df[factor_cols].to_numpy()])
+    y = df["y"].to_numpy()
 
     # OLS via lstsq — numerically stable
     coefs, *_ = np.linalg.lstsq(X, y, rcond=None)

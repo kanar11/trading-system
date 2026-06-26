@@ -13,10 +13,12 @@ Usage:
 
 import argparse
 import logging
+from collections.abc import Callable
 from functools import partial
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from src.backtest.engine import backtest_strategy
 from src.data.csv_loader import load_csv_ohlcv
@@ -236,7 +238,7 @@ def setup_logging(verbose: bool = False) -> None:
     )
 
 
-def _build_strategy_fn(args: argparse.Namespace):
+def _build_strategy_fn(args: argparse.Namespace) -> Callable[[pd.DataFrame], pd.DataFrame]:
     """Return a strategy function based on CLI args."""
     mom_fn = partial(
         momentum_strategy,
@@ -292,7 +294,9 @@ def _build_strategy_fn(args: argparse.Namespace):
     return mom_fn
 
 
-def _build_backtest_fn(args: argparse.Namespace, risk_config: RiskConfig | None):
+def _build_backtest_fn(
+    args: argparse.Namespace, risk_config: RiskConfig | None
+) -> Callable[[pd.DataFrame], tuple[pd.DataFrame, pd.DataFrame]]:
     """Return a backtest function based on CLI args."""
     return partial(
         backtest_strategy,

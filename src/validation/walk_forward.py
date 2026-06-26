@@ -115,6 +115,8 @@ def run_walk_forward(
     all_oos_returns: list[pd.Series] = []
     fold_num = 0
 
+    step_days = config.step_days if config.step_days is not None else config.out_of_sample_days
+
     start = 0
     while start + window_size <= n:
         fold_num += 1
@@ -172,7 +174,7 @@ def run_walk_forward(
         folds.append(fold_result)
         all_oos_returns.append(oos_returns)
 
-        start += config.step_days
+        start += step_days
 
     if not folds:
         raise ValueError("No folds could be created with the given configuration.")

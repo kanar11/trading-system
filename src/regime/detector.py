@@ -16,6 +16,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -117,9 +118,9 @@ def _rolling_hurst(series: pd.Series, window: int = 100) -> pd.Series:
     Returns:
         Rolling Hurst exponent estimate.
     """
-    log_returns = np.log(series / series.shift(1))
+    log_returns = cast("pd.Series", np.log(series / series.shift(1)))
 
-    def _hurst_rs(x):
+    def _hurst_rs(x: pd.Series) -> float:
         x = x.dropna()
         if len(x) < 20:
             return np.nan
@@ -132,7 +133,7 @@ def _rolling_hurst(series: pd.Series, window: int = 100) -> pd.Series:
         if s == 0 or r == 0:
             return np.nan
 
-        return np.log(r / s) / np.log(len(x))
+        return float(np.log(r / s) / np.log(len(x)))
 
     hurst = log_returns.rolling(window).apply(_hurst_rs, raw=False)
     return hurst
@@ -242,12 +243,12 @@ def _smooth_regime(
 
     encoded = regime_series.map(mapping).astype(float)
 
-    def _majority(x):
+    def _majority(x: pd.Series) -> int:
         x = x.dropna()
         if len(x) == 0:
             return 1  # undefined
         counts = np.bincount(x.astype(int), minlength=3)
-        return counts.argmax()
+        return int(counts.argmax())
 
     smoothed = encoded.rolling(window, center=False, min_periods=1).apply(_majority, raw=False)
     return smoothed.map(reverse)

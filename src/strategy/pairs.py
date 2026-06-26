@@ -145,8 +145,8 @@ def engle_granger_test(
     if joined.shape[0] < max_lag + 10:
         raise ValueError(f"Need at least {max_lag + 10} aligned observations.")
 
-    y_arr = joined.iloc[:, 0].values
-    x_arr = joined.iloc[:, 1].values
+    y_arr = joined.iloc[:, 0].to_numpy()
+    x_arr = joined.iloc[:, 1].to_numpy()
 
     beta, alpha = _ols_simple(y_arr, x_arr)
     residuals = y_arr - alpha - beta * x_arr

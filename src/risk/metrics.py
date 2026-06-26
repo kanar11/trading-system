@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -47,7 +48,7 @@ def historical_var(returns: pd.Series, level: float = 0.05) -> float:
     r = pd.Series(returns).dropna()
     if r.empty:
         return 0.0
-    q = float(np.quantile(r.values, level))
+    q = float(np.quantile(r.to_numpy(), level))
     return float(-min(q, 0.0))
 
 
@@ -62,7 +63,7 @@ def historical_cvar(returns: pd.Series, level: float = 0.05) -> float:
     r = pd.Series(returns).dropna()
     if r.empty:
         return 0.0
-    threshold = float(np.quantile(r.values, level))
+    threshold = float(np.quantile(r.to_numpy(), level))
     tail = r[r <= threshold]
     if tail.empty:
         return 0.0
@@ -165,7 +166,7 @@ def drawdown_stats(returns: pd.Series) -> DrawdownStats:
     if dd.min() >= 0:
         return DrawdownStats(0.0, None, None, None, 0, None)
 
-    end_idx = dd.idxmin()
+    end_idx = cast("pd.Timestamp", dd.idxmin())
     max_dd = float(dd.loc[end_idx])
 
     # start of drawdown = last bar at a peak before end_idx
@@ -222,8 +223,8 @@ def tail_ratio(returns: pd.Series, level: float = 0.05) -> float:
     r = pd.Series(returns).dropna()
     if r.empty:
         return 0.0
-    right = abs(float(np.quantile(r.values, 1 - level)))
-    left = abs(float(np.quantile(r.values, level)))
+    right = abs(float(np.quantile(r.to_numpy(), 1 - level)))
+    left = abs(float(np.quantile(r.to_numpy(), level)))
     if left == 0:
         return float("inf") if right > 0 else 0.0
     return right / left

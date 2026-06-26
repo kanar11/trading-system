@@ -109,7 +109,7 @@ def unanimous(signals: pd.DataFrame) -> pd.Series:
         Combined signal series in {-1, 0, 1}.
     """
     _validate_signal_matrix(signals)
-    first = signals.iloc[:, 0].values
-    all_same = (signals.values == first[:, None]).all(axis=1)
+    first = signals.iloc[:, 0].to_numpy()
+    all_same = (signals.to_numpy() == first[:, None]).all(axis=1)
     combined = np.where(all_same, first, 0).astype(int)
     return pd.Series(combined, index=signals.index, name="ensemble")

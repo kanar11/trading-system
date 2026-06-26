@@ -290,36 +290,40 @@ class EventEngine:
                 fill_price = open_p
 
             elif order.order_type is OrderType.LIMIT:
+                limit = order.limit_price
+                assert limit is not None  # guaranteed for LIMIT (Order.__post_init__)
                 # buy LIMIT fills if bar's low <= limit_price (price came down to us)
                 # sell LIMIT fills if bar's high >= limit_price (price came up to us)
-                if order.side is Side.BUY and low_p <= order.limit_price:
-                    fill_price = min(order.limit_price, open_p)  # gap protection
-                elif order.side is Side.SELL and high_p >= order.limit_price:
-                    fill_price = max(order.limit_price, open_p)
+                if order.side is Side.BUY and low_p <= limit:
+                    fill_price = min(limit, open_p)  # gap protection
+                elif order.side is Side.SELL and high_p >= limit:
+                    fill_price = max(limit, open_p)
 
             elif order.order_type is OrderType.STOP:
+                stop = order.stop_price
+                assert stop is not None  # guaranteed for STOP (Order.__post_init__)
                 # buy STOP triggers when price rises through stop_price
                 # sell STOP triggers when price falls through stop_price
-                triggered = (order.side is Side.BUY and high_p >= order.stop_price) or (
-                    order.side is Side.SELL and low_p <= order.stop_price
+                triggered = (order.side is Side.BUY and high_p >= stop) or (
+                    order.side is Side.SELL and low_p <= stop
                 )
                 if triggered:
                     # convert to market, fill at max(open, stop) for buy / min for sell
-                    if order.side is Side.BUY:
-                        fill_price = max(open_p, order.stop_price)
-                    else:
-                        fill_price = min(open_p, order.stop_price)
+                    fill_price = max(open_p, stop) if order.side is Side.BUY else min(open_p, stop)
 
             elif order.order_type is OrderType.STOP_LIMIT:
-                triggered = (order.side is Side.BUY and high_p >= order.stop_price) or (
-                    order.side is Side.SELL and low_p <= order.stop_price
+                stop = order.stop_price
+                limit = order.limit_price
+                assert stop is not None and limit is not None  # guaranteed for STOP_LIMIT
+                triggered = (order.side is Side.BUY and high_p >= stop) or (
+                    order.side is Side.SELL and low_p <= stop
                 )
                 # behave as LIMIT post-trigger
                 if triggered and (
-                    (order.side is Side.BUY and low_p <= order.limit_price)
-                    or (order.side is Side.SELL and high_p >= order.limit_price)
+                    (order.side is Side.BUY and low_p <= limit)
+                    or (order.side is Side.SELL and high_p >= limit)
                 ):
-                    fill_price = order.limit_price
+                    fill_price = limit
 
             if fill_price is None:
                 continue

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -39,15 +40,16 @@ def _drawdown_series(returns: pd.Series) -> pd.Series:
 def _rolling_sharpe(returns: pd.Series, window: int = 63) -> pd.Series:
     mean = returns.rolling(window).mean()
     std = returns.rolling(window).std()
-    return (mean / std.replace(0, np.nan)) * np.sqrt(252)
+    return cast("pd.Series", (mean / std.replace(0, np.nan)) * (252**0.5))
 
 
 def _monthly_return_matrix(returns: pd.Series) -> pd.DataFrame:
     """Pivot daily returns into a year (rows) x month (cols) matrix."""
     monthly = (1 + returns.fillna(0)).resample("ME").prod() - 1
     df = monthly.to_frame("ret")
-    df["year"] = df.index.year
-    df["month"] = df.index.month
+    idx = pd.DatetimeIndex(df.index)
+    df["year"] = idx.year
+    df["month"] = idx.month
     return df.pivot(index="year", columns="month", values="ret")
 
 
@@ -85,11 +87,11 @@ def generate_tearsheet(
     # [1] Equity curve
     ax_eq = fig.add_subplot(gs[0, :])
     equity = (1 + returns).cumprod()
-    ax_eq.plot(equity.index, equity.values, label="Strategy", linewidth=1.3)
+    ax_eq.plot(equity.index, equity.to_numpy(), label="Strategy", linewidth=1.3)
     if benchmark is not None:
         bench = benchmark.reindex(returns.index).fillna(0)
         bench_eq = (1 + bench).cumprod()
-        ax_eq.plot(bench_eq.index, bench_eq.values, label="Benchmark", linewidth=1.0, alpha=0.7)
+        ax_eq.plot(bench_eq.index, bench_eq.to_numpy(), label="Benchmark", linewidth=1.0, alpha=0.7)
     ax_eq.set_title("Equity curve")
     ax_eq.set_ylabel("Equity")
     ax_eq.legend(loc="upper left")
@@ -98,7 +100,7 @@ def generate_tearsheet(
     # [2] Underwater drawdown
     ax_dd = fig.add_subplot(gs[1, 0])
     dd = _drawdown_series(returns)
-    ax_dd.fill_between(dd.index, dd.values, 0, color="tab:red", alpha=0.4)
+    ax_dd.fill_between(dd.index, dd.to_numpy(), 0, color="tab:red", alpha=0.4)
     ax_dd.set_title("Underwater drawdown")
     ax_dd.set_ylabel("Drawdown")
     ax_dd.grid(alpha=0.3)
@@ -106,7 +108,7 @@ def generate_tearsheet(
     # [3] Rolling Sharpe
     ax_rs = fig.add_subplot(gs[1, 1])
     rs = _rolling_sharpe(returns, window=rolling_window)
-    ax_rs.plot(rs.index, rs.values, color="tab:blue", linewidth=1.0)
+    ax_rs.plot(rs.index, rs.to_numpy(), color="tab:blue", linewidth=1.0)
     ax_rs.axhline(0, color="black", linewidth=0.5)
     ax_rs.set_title(f"Rolling Sharpe ({rolling_window}d)")
     ax_rs.set_ylabel("Sharpe")
@@ -152,7 +154,7 @@ def generate_tearsheet(
 
     # [5] Returns distribution
     ax_hist = fig.add_subplot(gs[3, 0])
-    ax_hist.hist(returns.values, bins=50, color="tab:blue", alpha=0.7)
+    ax_hist.hist(returns.to_numpy(), bins=50, color="tab:blue", alpha=0.7)
     sigma = returns.std()
     ax_hist.axvline(0, color="black", linewidth=0.5)
     ax_hist.axvline(sigma, color="grey", linewidth=0.5, linestyle="--", label="±1σ")

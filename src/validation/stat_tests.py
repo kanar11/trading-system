@@ -88,7 +88,7 @@ def sharpe_ttest(returns: pd.Series, rf_daily: float = 0.0) -> SharpeTestResult:
     Returns:
         :class:`SharpeTestResult`.
     """
-    r = pd.Series(returns).dropna().values
+    r = pd.Series(returns).dropna().to_numpy()
     n = len(r)
     if n < 2:
         return SharpeTestResult(0.0, 0.0, 1.0, n)
@@ -125,7 +125,7 @@ def probabilistic_sharpe_ratio(
     Returns:
         Probability ∈ [0, 1].
     """
-    r = pd.Series(returns).dropna().values
+    r = pd.Series(returns).dropna().to_numpy()
     n = len(r)
     if n < 4:
         return 0.5
@@ -176,7 +176,7 @@ def deflated_sharpe_ratio(
         Deflated PSR ∈ [0, 1]. Values close to 1 → the strategy
         likely has real edge even after accounting for trial inflation.
     """
-    r = pd.Series(returns).dropna().values
+    r = pd.Series(returns).dropna().to_numpy()
     n = len(r)
     if n < 4 or n_trials < 1:
         return 0.5

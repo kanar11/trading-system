@@ -12,7 +12,7 @@ def obv(close: pd.Series, volume: pd.Series) -> pd.Series:
     Adds volume on up-days, subtracts on down-days, leaves unchanged on
     unchanged-close days. Cumulative.
     """
-    sign = np.sign(close.diff()).fillna(0)
+    sign: pd.Series = np.sign(close.diff()).fillna(0)
     return (sign * volume).cumsum().rename("obv")
 
 
@@ -37,7 +37,7 @@ def vwap(
     if anchor is None:
         return pv.cumsum() / volume.cumsum()
 
-    groups = price.index.to_period(anchor)
+    groups = pd.DatetimeIndex(price.index).to_period(anchor)
     cum_pv = pv.groupby(groups).cumsum()
     cum_v = volume.groupby(groups).cumsum()
     return (cum_pv / cum_v).rename("vwap")
