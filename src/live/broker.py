@@ -25,7 +25,7 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 
 from src.oms import Order, OrderStatus, OrderType, Portfolio, Side
 
@@ -116,7 +116,7 @@ class PaperBroker(Broker):
         """
         order.order_id = next(self._next_id)
         order.status = OrderStatus.WORKING
-        order.created_at = datetime.utcnow()
+        order.created_at = datetime.now(UTC).replace(tzinfo=None)
         self._orders[order.order_id] = order
 
         if mark_price is None:
@@ -221,7 +221,7 @@ class PaperBroker(Broker):
             quantity=qty,
             price=fill_price,
             commission=commission,
-            when=datetime.utcnow(),
+            when=datetime.now(UTC).replace(tzinfo=None),
         )
         self.fills.append(fill)
         return fill

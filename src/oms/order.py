@@ -47,7 +47,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 
 # Tolerance for quantity comparisons. Share/lot quantities are usually
@@ -361,7 +361,7 @@ class Order:
         Args:
             fill_qty: Quantity executed (> 0).
             fill_price: Execution price (> 0).
-            when: Event timestamp. Defaults to ``datetime.utcnow()``.
+            when: Event timestamp. Defaults to the current (naive) UTC time.
                 Must be >= the previous fill's timestamp (the audit log
                 is strictly ordered).
             liquidity: MAKER or TAKER (accepts the enum or its string).
@@ -393,7 +393,7 @@ class Order:
                 f"(filled {self.filled_quantity} of {self.quantity})"
             )
 
-        ts = when if when is not None else datetime.utcnow()
+        ts = when if when is not None else datetime.now(UTC).replace(tzinfo=None)
         if self.last_fill_at is not None and ts < self.last_fill_at:
             raise ValueError(f"out-of-order fill: {ts} precedes previous fill {self.last_fill_at}")
         liq = Liquidity(liquidity) if not isinstance(liquidity, Liquidity) else liquidity
