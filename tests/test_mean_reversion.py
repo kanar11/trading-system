@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.strategy.mean_reversion import (
+from quantbt.strategy.mean_reversion import (
     _bollinger_bands,
     _rsi,
     mean_reversion_strategy,

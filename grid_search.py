@@ -7,7 +7,7 @@ compatibility. For full control use:
 
 import logging
 
-from src.reporting.sweep import run_sweep
+from quantbt.reporting.sweep import run_sweep
 
 if __name__ == "__main__":
     logging.basicConfig(

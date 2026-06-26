@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 import pandas as pd
 
-from src.risk.manager import RiskConfig, apply_risk_controls, summarise_risk_events
+from quantbt.risk.manager import RiskConfig, apply_risk_controls, summarise_risk_events
 
 
 def _make_backtest_df(prices: Sequence[float], positions: Sequence[float]) -> pd.DataFrame:

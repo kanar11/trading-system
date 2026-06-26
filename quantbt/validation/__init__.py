@@ -1,6 +1,6 @@
 """Walk-forward validation for strategy robustness testing."""
 
-from src.validation.walk_forward import (
+from quantbt.validation.walk_forward import (
     FoldResult,
     WalkForwardConfig,
     print_walk_forward_report,

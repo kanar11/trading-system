@@ -10,7 +10,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from src.risk.manager import RiskConfig, apply_risk_controls
+from quantbt.risk.manager import RiskConfig, apply_risk_controls
 
 logger = logging.getLogger(__name__)
 

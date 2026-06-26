@@ -17,7 +17,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from src.reporting.metrics import calculate_metrics
+from quantbt.reporting.metrics import calculate_metrics
 
 logger = logging.getLogger(__name__)
 

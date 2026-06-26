@@ -10,10 +10,10 @@ from typing import Any
 
 import pandas as pd
 
-from src.backtest.engine import backtest_strategy
-from src.data.loader import load_yahoo_ohlcv
-from src.reporting.metrics import calculate_metrics, calculate_trade_stats
-from src.strategy.momentum import momentum_strategy
+from quantbt.backtest.engine import backtest_strategy
+from quantbt.data.loader import load_yahoo_ohlcv
+from quantbt.reporting.metrics import calculate_metrics, calculate_trade_stats
+from quantbt.strategy.momentum import momentum_strategy
 
 logger = logging.getLogger(__name__)
 

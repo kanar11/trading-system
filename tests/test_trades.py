@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from src.reporting.trades import build_trade_log
+from quantbt.reporting.trades import build_trade_log
 
 
 def _df(pos: list[int], close: list[float]) -> pd.DataFrame:

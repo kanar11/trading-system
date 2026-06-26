@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from src.reporting.metrics import calculate_metrics, calculate_trade_stats
+from quantbt.reporting.metrics import calculate_metrics, calculate_trade_stats
 
 # ---------------------------------------------------------------------------
 # Portfolio-level metrics

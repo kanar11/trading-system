@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.reporting.sweep import run_sweep
+from quantbt.reporting.sweep import run_sweep
 
 
 def test_sweep_with_injected_df(sample_ohlcv: pd.DataFrame, tmp_path: Path) -> None:

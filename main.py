@@ -20,14 +20,14 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from src.backtest.engine import backtest_strategy
-from src.data.loader import load_yahoo_ohlcv
-from src.regime.detector import RegimeConfig, adaptive_strategy
-from src.reporting.metrics import calculate_metrics, calculate_trade_stats
-from src.risk.manager import RiskConfig, summarise_risk_events
-from src.strategy.mean_reversion import mean_reversion_strategy
-from src.strategy.momentum import momentum_strategy
-from src.validation.walk_forward import (
+from quantbt.backtest.engine import backtest_strategy
+from quantbt.data.loader import load_yahoo_ohlcv
+from quantbt.regime.detector import RegimeConfig, adaptive_strategy
+from quantbt.reporting.metrics import calculate_metrics, calculate_trade_stats
+from quantbt.risk.manager import RiskConfig, summarise_risk_events
+from quantbt.strategy.mean_reversion import mean_reversion_strategy
+from quantbt.strategy.momentum import momentum_strategy
+from quantbt.validation.walk_forward import (
     WalkForwardConfig,
     print_walk_forward_report,
     run_walk_forward,

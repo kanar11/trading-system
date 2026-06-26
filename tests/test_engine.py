@@ -5,7 +5,7 @@ from collections.abc import Sequence
 import pandas as pd
 import pytest
 
-from src.backtest.engine import backtest_strategy
+from quantbt.backtest.engine import backtest_strategy
 
 
 def _make_signal_df(prices: Sequence[float], signals: Sequence[int]) -> pd.DataFrame:

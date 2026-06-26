@@ -5,7 +5,7 @@ from collections.abc import Sequence
 import pandas as pd
 import pytest
 
-from src.strategy.momentum import momentum_strategy
+from quantbt.strategy.momentum import momentum_strategy
 
 
 def _make_price_df(prices: Sequence[float]) -> pd.DataFrame:

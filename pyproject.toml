@@ -1,6 +1,10 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "trading-system"
-version = "0.4.0"
+version = "0.5.0.dev0"
 description = "Systematic trading backtester with momentum, mean reversion, regime detection, risk management, trade analytics, and walk-forward validation"
 requires-python = ">=3.11"
 dependencies = [
@@ -20,9 +24,13 @@ dev = [
     "types-seaborn>=0.13",
 ]
 
+[tool.setuptools.packages.find]
+include = ["quantbt*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+addopts = "--strict-markers --strict-config"
 
 [tool.ruff]
 line-length = 100

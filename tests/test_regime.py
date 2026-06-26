@@ -5,7 +5,7 @@ from functools import partial
 import numpy as np
 import pandas as pd
 
-from src.regime.detector import (
+from quantbt.regime.detector import (
     RegimeConfig,
     RegimeType,
     _adx,
@@ -13,8 +13,8 @@ from src.regime.detector import (
     adaptive_strategy,
     detect_regime,
 )
-from src.strategy.mean_reversion import mean_reversion_strategy
-from src.strategy.momentum import momentum_strategy
+from quantbt.strategy.mean_reversion import mean_reversion_strategy
+from quantbt.strategy.momentum import momentum_strategy
 
 
 def _make_ohlc_df(n: int = 300, trend: bool = True) -> pd.DataFrame:

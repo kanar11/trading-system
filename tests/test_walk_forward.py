@@ -4,9 +4,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.backtest.engine import backtest_strategy
-from src.strategy.momentum import momentum_strategy
-from src.validation.walk_forward import (
+from quantbt.backtest.engine import backtest_strategy
+from quantbt.strategy.momentum import momentum_strategy
+from quantbt.validation.walk_forward import (
     WalkForwardConfig,
     print_walk_forward_report,
     run_walk_forward,

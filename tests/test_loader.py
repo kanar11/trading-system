@@ -6,8 +6,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.data import loader
-from src.data.loader import load_yahoo_ohlcv
+from quantbt.data import loader
+from quantbt.data.loader import load_yahoo_ohlcv
 
 SetFrame = Callable[[pd.DataFrame], None]
 

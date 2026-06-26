@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 from matplotlib.figure import Figure
 
-from src.reporting.plots import plot_equity
+from quantbt.reporting.plots import plot_equity
 
 
 def _equity_df(n: int = 50) -> pd.DataFrame:
