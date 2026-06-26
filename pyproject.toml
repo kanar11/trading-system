@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "trading-system"
 version = "0.8.0"
@@ -14,15 +18,21 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "pytest-cov>=5.0",
     "mypy>=1.0",
     "ruff>=0.6",
+    "pre-commit>=3.5",
     "pandas-stubs>=2.0",
     "types-seaborn>=0.13",
 ]
 
+[tool.setuptools.packages.find]
+include = ["src*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+addopts = "--strict-markers"
 
 [tool.ruff]
 line-length = 100
@@ -65,3 +75,17 @@ strict_equality = true
 [[tool.mypy.overrides]]
 module = ["yfinance.*"]
 ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 80
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
