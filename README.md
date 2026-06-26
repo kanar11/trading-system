@@ -149,7 +149,7 @@ trading_system/
 ├── examples/
 │   └── full_demo.py               # End-to-end demo touching every module
 ├── .github/workflows/
-│   └── test.yml                   # CI: pytest on Python 3.11 + 3.12
+│   └── ci.yml                     # CI: ruff + mypy + pytest/coverage (3.11 + 3.12)
 ├── main.py                        # Main pipeline entry point (CLI)
 ├── grid_search.py                 # Grid search script
 ├── plot_heatmap.py                # Heatmap visualisation
@@ -176,10 +176,11 @@ python -m venv .venv
 .venv\Scripts\activate
 ```
 
-### 2. Install dependencies
+### 2. Install the package
 
 ```bash
-pip install -r requirements.txt
+pip install -e .          # runtime install
+pip install -e ".[dev]"   # add the lint / type / test toolchain
 ```
 
 ### 3. Run the project
@@ -237,8 +238,23 @@ python examples/full_demo.py
 ### 4. Run tests
 
 ```bash
-pytest tests/ -v
+pytest                                          # 323 tests
+pytest --cov=src --cov-report=term-missing      # with coverage (floor: 80%, ~86% now)
 ```
+
+### 5. Code quality
+
+```bash
+ruff check .          # lint
+ruff format --check . # formatting
+mypy src main.py grid_search.py plot_heatmap.py  # strict type checks
+
+pre-commit install    # optional: run the checks automatically on each commit
+```
+
+All of the above run in CI (`.github/workflows/ci.yml`) on a Python 3.11 / 3.12
+matrix and are expected to pass cleanly (ruff, ruff-format, mypy --strict, and
+pytest + coverage).
 
 ## Strategies
 
@@ -653,7 +669,8 @@ The codebase is research-grade — it ships the architecture and components of a
 - pandas, NumPy
 - matplotlib, seaborn
 - yfinance
-- pytest
+- pytest (+ pytest-cov), ruff, mypy (strict, with pandas-stubs), pre-commit
+- GitHub Actions CI
 
 ## Author
 
