@@ -5,15 +5,15 @@ import pandas as pd
 import pytest
 
 from src.risk.sizing import (
-    kelly_fraction,
     atr_position_size,
     fixed_fractional,
+    kelly_fraction,
 )
-
 
 # ---------------------------------------------------------------------------
 # kelly_fraction
 # ---------------------------------------------------------------------------
+
 
 def test_kelly_zero_on_empty_input():
     assert kelly_fraction(pd.Series(dtype=float)) == 0.0
@@ -53,6 +53,7 @@ def test_kelly_half_is_half_of_full():
 # atr_position_size
 # ---------------------------------------------------------------------------
 
+
 def test_atr_size_zero_on_bad_inputs():
     assert atr_position_size(0, 1.0, 100_000) == 0.0
     assert atr_position_size(100, 0, 100_000) == 0.0
@@ -64,16 +65,24 @@ def test_atr_size_respects_risk_budget():
     # dollar risk = 1000, units = 1000 / 2 = 500, notional = 500 * 100 = 50_000
     # fraction = 50_000 / 100_000 = 0.5
     f = atr_position_size(
-        price=100, atr=1.0, equity=100_000, risk_per_trade=0.01,
-        atr_multiple=2.0, max_size=10.0,
+        price=100,
+        atr=1.0,
+        equity=100_000,
+        risk_per_trade=0.01,
+        atr_multiple=2.0,
+        max_size=10.0,
     )
     assert f == pytest.approx(0.5)
 
 
 def test_atr_size_capped():
     f = atr_position_size(
-        price=100, atr=0.5, equity=100_000, risk_per_trade=0.05,
-        atr_multiple=2.0, max_size=1.0,
+        price=100,
+        atr=0.5,
+        equity=100_000,
+        risk_per_trade=0.05,
+        atr_multiple=2.0,
+        max_size=1.0,
     )
     assert f == 1.0
 
@@ -81,6 +90,7 @@ def test_atr_size_capped():
 # ---------------------------------------------------------------------------
 # fixed_fractional
 # ---------------------------------------------------------------------------
+
 
 def test_fixed_fractional_zero_on_no_edge():
     # win-rate 50% with 1:1 payoff is breakeven

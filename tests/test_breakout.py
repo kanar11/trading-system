@@ -51,9 +51,7 @@ def test_atr_filter_suppresses_small_breakouts():
     # very gentle drift — breakouts will be tiny compared to ATR
     df = _make_ohlc([100 + 0.001 * i for i in range(50)])
     out_no_filter = breakout_strategy(df, entry_window=10, exit_window=5, atr_filter=0)
-    out_with_filter = breakout_strategy(
-        df, entry_window=10, exit_window=5, atr_filter=5.0
-    )
+    out_with_filter = breakout_strategy(df, entry_window=10, exit_window=5, atr_filter=5.0)
 
     # filter must reduce or equal the number of long entries
     assert (out_with_filter["signal"] == 1).sum() <= (out_no_filter["signal"] == 1).sum()

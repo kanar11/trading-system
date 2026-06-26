@@ -5,10 +5,23 @@ import pandas as pd
 import pytest
 
 from src.indicators import (
-    sma, ema, wma, vwma,
-    rsi, macd, stochastic, williams_r, cci, roc,
-    atr, bollinger, keltner, donchian,
-    obv, vwap, chaikin_ad,
+    atr,
+    bollinger,
+    cci,
+    chaikin_ad,
+    donchian,
+    ema,
+    keltner,
+    macd,
+    obv,
+    roc,
+    rsi,
+    sma,
+    stochastic,
+    vwap,
+    vwma,
+    williams_r,
+    wma,
 )
 
 
@@ -33,6 +46,7 @@ def ohlcv():
 # ---------------------------------------------------------------------------
 # trend
 # ---------------------------------------------------------------------------
+
 
 class TestTrend:
     def test_sma_equals_window_mean(self, ohlcv):
@@ -74,6 +88,7 @@ class TestTrend:
 # ---------------------------------------------------------------------------
 # momentum
 # ---------------------------------------------------------------------------
+
 
 class TestMomentum:
     def test_rsi_bounds(self, ohlcv):
@@ -118,6 +133,7 @@ class TestMomentum:
 # volatility
 # ---------------------------------------------------------------------------
 
+
 class TestVolatility:
     def test_atr_non_negative(self, ohlcv):
         a = atr(ohlcv["high"], ohlcv["low"], ohlcv["close"]).dropna()
@@ -156,6 +172,7 @@ class TestVolatility:
 # ---------------------------------------------------------------------------
 # volume
 # ---------------------------------------------------------------------------
+
 
 class TestVolume:
     def test_obv_starts_at_zero_then_moves(self, ohlcv):

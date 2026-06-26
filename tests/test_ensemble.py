@@ -1,20 +1,20 @@
 """Tests for the signal-ensemble combiners."""
 
-import numpy as np
 import pandas as pd
 import pytest
 
-from src.strategy.ensemble import majority_vote, weighted_sum, unanimous
+from src.strategy.ensemble import majority_vote, unanimous, weighted_sum
 
 
 def _sigframe(arrays: list[list[int]], cols: list[str] | None = None) -> pd.DataFrame:
     cols = cols or [f"s{i}" for i in range(len(arrays))]
-    return pd.DataFrame(dict(zip(cols, arrays)))
+    return pd.DataFrame(dict(zip(cols, arrays, strict=True)))
 
 
 # ---------------------------------------------------------------------------
 # majority_vote
 # ---------------------------------------------------------------------------
+
 
 def test_majority_vote_basic():
     sf = _sigframe([[1, 1, -1], [1, -1, -1], [0, 1, -1]])
@@ -44,6 +44,7 @@ def test_majority_vote_rejects_empty():
 # ---------------------------------------------------------------------------
 # weighted_sum
 # ---------------------------------------------------------------------------
+
 
 def test_weighted_sum_with_dict_weights():
     sf = _sigframe([[1, 1, 1], [-1, -1, -1]], cols=["a", "b"])
@@ -82,6 +83,7 @@ def test_weighted_sum_rejects_zero_total_weight():
 # ---------------------------------------------------------------------------
 # unanimous
 # ---------------------------------------------------------------------------
+
 
 def test_unanimous_only_unanimous_rows_pass():
     sf = _sigframe([[1, 1, 0, -1, -1], [1, 1, 0, -1, 0]])

@@ -48,7 +48,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 # Tolerance for quantity comparisons. Share/lot quantities are usually
 # integral, but vol-targeting and fractional-share venues produce
@@ -77,6 +76,7 @@ class OverFill(IllegalOrderTransition, ValueError):
 
 class Side(str, Enum):
     """Trade side."""
+
     BUY = "BUY"
     SELL = "SELL"
 
@@ -86,13 +86,14 @@ class Side(str, Enum):
         return 1 if self is Side.BUY else -1
 
     @property
-    def opposite(self) -> "Side":
+    def opposite(self) -> Side:
         return Side.SELL if self is Side.BUY else Side.BUY
 
 
 class OrderType(str, Enum):
     """Order type. STOP and STOP_LIMIT use ``stop_price``; LIMIT and
     STOP_LIMIT use ``limit_price``; MARKET fills at next bar's open."""
+
     MARKET = "MARKET"
     LIMIT = "LIMIT"
     STOP = "STOP"
@@ -101,14 +102,16 @@ class OrderType(str, Enum):
 
 class TimeInForce(str, Enum):
     """How long an order remains active."""
-    DAY = "DAY"      # cancel at end of day if not filled
-    GTC = "GTC"      # good til cancelled
-    IOC = "IOC"      # immediate or cancel — fill what you can, cancel rest
-    FOK = "FOK"      # fill or kill — fill in full immediately or cancel
+
+    DAY = "DAY"  # cancel at end of day if not filled
+    GTC = "GTC"  # good til cancelled
+    IOC = "IOC"  # immediate or cancel — fill what you can, cancel rest
+    FOK = "FOK"  # fill or kill — fill in full immediately or cancel
 
 
 class OrderStatus(str, Enum):
     """Lifecycle state of an order."""
+
     PENDING = "PENDING"
     WORKING = "WORKING"
     PARTIALLY_FILLED = "PARTIALLY_FILLED"
@@ -123,12 +126,15 @@ class OrderStatus(str, Enum):
     @property
     def is_active(self) -> bool:
         return self in (
-            OrderStatus.PENDING, OrderStatus.WORKING, OrderStatus.PARTIALLY_FILLED,
+            OrderStatus.PENDING,
+            OrderStatus.WORKING,
+            OrderStatus.PARTIALLY_FILLED,
         )
 
 
 class RejectReason(str, Enum):
     """Structured reject reasons so risk / OMS layers can branch on them."""
+
     NONE = ""
     INSUFFICIENT_QUANTITY = "INSUFFICIENT_QUANTITY"
     INVALID_PRICE = "INVALID_PRICE"
@@ -144,6 +150,7 @@ class Liquidity(str, Enum):
 
     Matters for fee tiers: most venues rebate makers and charge takers.
     """
+
     MAKER = "MAKER"
     TAKER = "TAKER"
 
@@ -152,17 +159,30 @@ class Liquidity(str, Enum):
 # its set. Self-loops are listed where they're meaningful (additional
 # partial fills keep an order PARTIALLY_FILLED).
 _LEGAL_TRANSITIONS: dict[OrderStatus, frozenset[OrderStatus]] = {
-    OrderStatus.PENDING: frozenset({
-        OrderStatus.WORKING, OrderStatus.PARTIALLY_FILLED, OrderStatus.FILLED,
-        OrderStatus.CANCELLED, OrderStatus.REJECTED,
-    }),
-    OrderStatus.WORKING: frozenset({
-        OrderStatus.PARTIALLY_FILLED, OrderStatus.FILLED,
-        OrderStatus.CANCELLED, OrderStatus.REJECTED,
-    }),
-    OrderStatus.PARTIALLY_FILLED: frozenset({
-        OrderStatus.PARTIALLY_FILLED, OrderStatus.FILLED, OrderStatus.CANCELLED,
-    }),
+    OrderStatus.PENDING: frozenset(
+        {
+            OrderStatus.WORKING,
+            OrderStatus.PARTIALLY_FILLED,
+            OrderStatus.FILLED,
+            OrderStatus.CANCELLED,
+            OrderStatus.REJECTED,
+        }
+    ),
+    OrderStatus.WORKING: frozenset(
+        {
+            OrderStatus.PARTIALLY_FILLED,
+            OrderStatus.FILLED,
+            OrderStatus.CANCELLED,
+            OrderStatus.REJECTED,
+        }
+    ),
+    OrderStatus.PARTIALLY_FILLED: frozenset(
+        {
+            OrderStatus.PARTIALLY_FILLED,
+            OrderStatus.FILLED,
+            OrderStatus.CANCELLED,
+        }
+    ),
     OrderStatus.FILLED: frozenset(),
     OrderStatus.CANCELLED: frozenset(),
     OrderStatus.REJECTED: frozenset(),
@@ -180,6 +200,7 @@ class Fill:
         price: Execution price (> 0).
         liquidity: MAKER or TAKER.
     """
+
     seq: int
     ts: datetime
     quantity: float
@@ -222,18 +243,18 @@ class Order:
     side: Side
     quantity: float
     order_type: OrderType = OrderType.MARKET
-    limit_price: Optional[float] = None
-    stop_price: Optional[float] = None
+    limit_price: float | None = None
+    stop_price: float | None = None
     time_in_force: TimeInForce = TimeInForce.DAY
-    order_id: Optional[int] = None
-    created_at: Optional[datetime] = None
-    client_tag: Optional[str] = None
+    order_id: int | None = None
+    created_at: datetime | None = None
+    client_tag: str | None = None
 
     # --- engine-managed state (init=False) ---
     status: OrderStatus = field(default=OrderStatus.PENDING, init=False)
     filled_quantity: float = field(default=0.0, init=False)
     avg_fill_price: float = field(default=0.0, init=False)
-    last_fill_at: Optional[datetime] = field(default=None, init=False)
+    last_fill_at: datetime | None = field(default=None, init=False)
     fills: list[Fill] = field(default_factory=list, init=False)
     version: int = field(default=0, init=False)
     reject_reason: RejectReason = field(default=RejectReason.NONE, init=False)
@@ -308,10 +329,9 @@ class Order:
         Raises:
             IllegalOrderTransition: If the move is not in the legal table.
         """
-        if new_status == self.status:
-            # idempotent self-transition only allowed where the table says so
-            if new_status not in _LEGAL_TRANSITIONS[self.status]:
-                return
+        # idempotent self-transition only allowed where the table says so
+        if new_status == self.status and new_status not in _LEGAL_TRANSITIONS[self.status]:
+            return
         if new_status not in _LEGAL_TRANSITIONS[self.status]:
             raise IllegalOrderTransition(
                 f"order {self.order_id}: illegal transition "
@@ -332,7 +352,7 @@ class Order:
         self,
         fill_qty: float,
         fill_price: float,
-        when: Optional[datetime] = None,
+        when: datetime | None = None,
         liquidity: Liquidity | str = Liquidity.TAKER,
     ) -> Fill:
         """Apply a (partial) fill and advance the state machine.
@@ -374,9 +394,7 @@ class Order:
 
         ts = when if when is not None else datetime.utcnow()
         if self.last_fill_at is not None and ts < self.last_fill_at:
-            raise ValueError(
-                f"out-of-order fill: {ts} precedes previous fill {self.last_fill_at}"
-            )
+            raise ValueError(f"out-of-order fill: {ts} precedes previous fill {self.last_fill_at}")
         liq = Liquidity(liquidity) if not isinstance(liquidity, Liquidity) else liquidity
 
         # running notional → drift-free average price
@@ -440,9 +458,9 @@ class Order:
 
     def amend(
         self,
-        new_quantity: Optional[float] = None,
-        new_limit_price: Optional[float] = None,
-        new_stop_price: Optional[float] = None,
+        new_quantity: float | None = None,
+        new_limit_price: float | None = None,
+        new_stop_price: float | None = None,
     ) -> int:
         """Cancel-replace the order's quantity / prices in place.
 
@@ -471,8 +489,7 @@ class Order:
                 raise ValueError("new_quantity must be > 0")
             if new_quantity < self.filled_quantity - QTY_EPSILON:
                 raise ValueError(
-                    f"new_quantity {new_quantity} is below already-filled "
-                    f"{self.filled_quantity}"
+                    f"new_quantity {new_quantity} is below already-filled {self.filled_quantity}"
                 )
             self.quantity = new_quantity
 

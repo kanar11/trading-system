@@ -5,14 +5,18 @@ from datetime import datetime
 import pytest
 
 from src.oms import (
-    Order, OrderStatus, OrderType, Side, TimeInForce,
-    Position, Portfolio,
+    Order,
+    OrderStatus,
+    OrderType,
+    Portfolio,
+    Position,
+    Side,
 )
-
 
 # ---------------------------------------------------------------------------
 # Order
 # ---------------------------------------------------------------------------
+
 
 class TestOrder:
     def test_construct_market_order(self):
@@ -76,6 +80,7 @@ class TestOrder:
 # ---------------------------------------------------------------------------
 # Position
 # ---------------------------------------------------------------------------
+
 
 class TestPosition:
     def test_opens_long(self):
@@ -147,6 +152,7 @@ class TestPosition:
 # ---------------------------------------------------------------------------
 # Portfolio
 # ---------------------------------------------------------------------------
+
 
 class TestPortfolio:
     def test_starts_with_initial_cash(self):

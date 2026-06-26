@@ -46,12 +46,12 @@ class Strategy(ABC):
 
     name: str = "Strategy"
 
-    def on_start(self, ctx: "Context") -> None:
+    def on_start(self, ctx: Context) -> None:
         """Hook called once before the first bar. Default: no-op."""
         pass
 
     @abstractmethod
-    def on_bar(self, ctx: "Context") -> None:
+    def on_bar(self, ctx: Context) -> None:
         """Required: called once per bar.
 
         Implementations typically:
@@ -61,7 +61,7 @@ class Strategy(ABC):
         """
         ...
 
-    def on_order_event(self, order: "Order") -> None:
+    def on_order_event(self, order: Order) -> None:
         """Hook called by the engine after each fill / cancel / reject.
 
         Currently the engine does not invoke this — kept for future
@@ -69,7 +69,7 @@ class Strategy(ABC):
         """
         pass
 
-    def on_end(self, ctx: "Context") -> None:
+    def on_end(self, ctx: Context) -> None:
         """Hook called once after the last bar. Default: no-op."""
         pass
 
@@ -77,6 +77,7 @@ class Strategy(ABC):
 # ---------------------------------------------------------------------------
 # Canonical example: SMA crossover
 # ---------------------------------------------------------------------------
+
 
 class SmaCrossoverStrategy(Strategy):
     """Classic fast/slow simple-moving-average crossover.
@@ -98,7 +99,9 @@ class SmaCrossoverStrategy(Strategy):
 
     name = "SmaCrossover"
 
-    def __init__(self, fast: int = 10, slow: int = 30, trade_qty: float = 10, allow_short: bool = True):
+    def __init__(
+        self, fast: int = 10, slow: int = 30, trade_qty: float = 10, allow_short: bool = True
+    ):
         if fast >= slow:
             raise ValueError(f"fast ({fast}) must be < slow ({slow})")
         self.fast = fast
@@ -107,16 +110,18 @@ class SmaCrossoverStrategy(Strategy):
         self.allow_short = allow_short
         self._prev_signal = 0
 
-    def on_bar(self, ctx: "Context") -> None:
+    def on_bar(self, ctx: Context) -> None:
         history = ctx.history
         if len(history) < self.slow:
             return  # warm-up
 
         closes = history["close"]
-        fast_ma = closes.iloc[-self.fast:].mean()
-        slow_ma = closes.iloc[-self.slow:].mean()
+        fast_ma = closes.iloc[-self.fast :].mean()
+        slow_ma = closes.iloc[-self.slow :].mean()
 
-        new_signal = 1 if fast_ma > slow_ma else (-1 if (self.allow_short and fast_ma < slow_ma) else 0)
+        new_signal = (
+            1 if fast_ma > slow_ma else (-1 if (self.allow_short and fast_ma < slow_ma) else 0)
+        )
         if new_signal == self._prev_signal:
             return
 
@@ -125,11 +130,13 @@ class SmaCrossoverStrategy(Strategy):
         if not pos.is_flat:
             close_side = "SELL" if pos.is_long else "BUY"
             from src.oms import Side
+
             ctx.submit_order(Side[close_side], abs(pos.quantity), client_tag=f"{self.name}:close")
 
         # then open new position in the target direction
         if new_signal != 0:
             from src.oms import Side
+
             side = Side.BUY if new_signal > 0 else Side.SELL
             ctx.submit_order(side, self.trade_qty, client_tag=f"{self.name}:open")
 

@@ -102,9 +102,9 @@ def breakout_strategy(
 
     for i in range(n):
         # exit first — Donchian exit channel breach
-        if state == 1 and not np.isnan(exit_low[i]) and closes[i] <= exit_low[i]:
-            state = 0
-        elif state == -1 and not np.isnan(exit_high[i]) and closes[i] >= exit_high[i]:
+        if (state == 1 and not np.isnan(exit_low[i]) and closes[i] <= exit_low[i]) or (
+            state == -1 and not np.isnan(exit_high[i]) and closes[i] >= exit_high[i]
+        ):
             state = 0
 
         # then check entry

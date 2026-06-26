@@ -5,11 +5,19 @@ import pandas as pd
 import pytest
 
 from src.risk.metrics import (
-    historical_var, historical_cvar, parametric_var,
-    omega_ratio, ulcer_index, gain_to_pain_ratio,
-    drawdown_stats, DrawdownStats,
-    downside_deviation, upside_deviation, tail_ratio, common_ratio,
+    DrawdownStats,
+    common_ratio,
+    downside_deviation,
+    drawdown_stats,
+    gain_to_pain_ratio,
+    historical_cvar,
+    historical_var,
+    omega_ratio,
+    parametric_var,
     rolling_beta,
+    tail_ratio,
+    ulcer_index,
+    upside_deviation,
 )
 
 
@@ -23,6 +31,7 @@ def daily_returns():
 # ---------------------------------------------------------------------------
 # VaR / CVaR
 # ---------------------------------------------------------------------------
+
 
 class TestVaR:
     def test_historical_var_positive_loss(self, daily_returns):
@@ -56,6 +65,7 @@ class TestVaR:
 # Omega / Ulcer / G2P
 # ---------------------------------------------------------------------------
 
+
 class TestRatios:
     def test_omega_ratio_balanced(self):
         # symmetric returns around 0 → omega ~= 1
@@ -81,6 +91,7 @@ class TestRatios:
 # ---------------------------------------------------------------------------
 # Drawdown
 # ---------------------------------------------------------------------------
+
 
 class TestDrawdown:
     def test_drawdown_zero_on_monotone_up(self):
@@ -111,6 +122,7 @@ class TestDrawdown:
 # Deviations / tail / common
 # ---------------------------------------------------------------------------
 
+
 class TestDeviationsAndTail:
     def test_downside_deviation_only_uses_negatives(self):
         r = pd.Series([0.05, 0.04, -0.01, 0.03, -0.02])
@@ -139,6 +151,7 @@ class TestDeviationsAndTail:
 # ---------------------------------------------------------------------------
 # Rolling beta
 # ---------------------------------------------------------------------------
+
 
 class TestRollingBeta:
     def test_rolling_beta_of_self_equals_one(self, daily_returns):

@@ -1,8 +1,6 @@
 """Tests for the risk management module."""
 
-import numpy as np
 import pandas as pd
-import pytest
 
 from src.risk.manager import RiskConfig, apply_risk_controls, summarise_risk_events
 
@@ -27,7 +25,9 @@ class TestStopLoss:
         positions = [0, 1, 1, 1, 1]
         df = _make_backtest_df(prices, positions)
 
-        config = RiskConfig(stop_loss=0.05, take_profit=None, trailing_stop=None, daily_loss_limit=None)
+        config = RiskConfig(
+            stop_loss=0.05, take_profit=None, trailing_stop=None, daily_loss_limit=None
+        )
         result = apply_risk_controls(df, config)
 
         # position should be zeroed at index 2 (6% drop)
@@ -39,7 +39,9 @@ class TestStopLoss:
         positions = [0, 1, 1, 1]
         df = _make_backtest_df(prices, positions)
 
-        config = RiskConfig(stop_loss=None, take_profit=None, trailing_stop=None, daily_loss_limit=None)
+        config = RiskConfig(
+            stop_loss=None, take_profit=None, trailing_stop=None, daily_loss_limit=None
+        )
         result = apply_risk_controls(df, config)
 
         # all positions should remain
@@ -54,7 +56,9 @@ class TestTakeProfit:
         positions = [0, 1, 1, 1]
         df = _make_backtest_df(prices, positions)
 
-        config = RiskConfig(stop_loss=None, take_profit=0.10, trailing_stop=None, daily_loss_limit=None)
+        config = RiskConfig(
+            stop_loss=None, take_profit=0.10, trailing_stop=None, daily_loss_limit=None
+        )
         result = apply_risk_controls(df, config)
 
         assert result["scaled_position"].iloc[2] == 0.0
@@ -68,7 +72,9 @@ class TestTrailingStop:
         positions = [0, 1, 1, 1, 1]
         df = _make_backtest_df(prices, positions)
 
-        config = RiskConfig(stop_loss=None, take_profit=None, trailing_stop=0.03, daily_loss_limit=None)
+        config = RiskConfig(
+            stop_loss=None, take_profit=None, trailing_stop=0.03, daily_loss_limit=None
+        )
         result = apply_risk_controls(df, config)
 
         # peak is 115, drop to 111 is ~3.5% drawdown
@@ -83,8 +89,11 @@ class TestMaxPosition:
         df = _make_backtest_df(prices, positions)
 
         config = RiskConfig(
-            stop_loss=None, take_profit=None, trailing_stop=None,
-            max_position=1.5, daily_loss_limit=None,
+            stop_loss=None,
+            take_profit=None,
+            trailing_stop=None,
+            max_position=1.5,
+            daily_loss_limit=None,
         )
         result = apply_risk_controls(df, config)
 
@@ -98,7 +107,9 @@ class TestSummariseRiskEvents:
         positions = [0, 1, 1, 1, 1]
         df = _make_backtest_df(prices, positions)
 
-        config = RiskConfig(stop_loss=0.05, take_profit=None, trailing_stop=None, daily_loss_limit=None)
+        config = RiskConfig(
+            stop_loss=0.05, take_profit=None, trailing_stop=None, daily_loss_limit=None
+        )
         result = apply_risk_controls(df, config)
         summary = summarise_risk_events(result)
 
@@ -110,7 +121,9 @@ class TestSummariseRiskEvents:
         positions = [0, 1, 1]
         df = _make_backtest_df(prices, positions)
 
-        config = RiskConfig(stop_loss=None, take_profit=None, trailing_stop=None, daily_loss_limit=None)
+        config = RiskConfig(
+            stop_loss=None, take_profit=None, trailing_stop=None, daily_loss_limit=None
+        )
         result = apply_risk_controls(df, config)
         summary = summarise_risk_events(result)
 

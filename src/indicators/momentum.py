@@ -35,9 +35,7 @@ def macd(
         raise ValueError(f"fast ({fast}) must be < slow ({slow})")
     macd_line = ema(close, fast) - ema(close, slow)
     sig_line = ema(macd_line, signal)
-    return pd.DataFrame(
-        {"macd": macd_line, "signal": sig_line, "hist": macd_line - sig_line}
-    )
+    return pd.DataFrame({"macd": macd_line, "signal": sig_line, "hist": macd_line - sig_line})
 
 
 def stochastic(

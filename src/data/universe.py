@@ -11,16 +11,42 @@ The point here is to ship usable defaults for back-research.
 
 from __future__ import annotations
 
-
 # Mega-cap US tech
 FAANG = ["META", "AAPL", "AMZN", "NFLX", "GOOGL"]
 FAANG_PLUS = FAANG + ["MSFT", "NVDA", "TSLA"]
 
 # Dow 30 (2024 composition)
 DOW30 = [
-    "AAPL", "AMGN", "AXP", "BA", "CAT", "CRM", "CSCO", "CVX", "DIS", "DOW",
-    "GS", "HD", "HON", "IBM", "INTC", "JNJ", "JPM", "KO", "MCD", "MMM",
-    "MRK", "MSFT", "NKE", "PG", "TRV", "UNH", "V", "VZ", "WBA", "WMT",
+    "AAPL",
+    "AMGN",
+    "AXP",
+    "BA",
+    "CAT",
+    "CRM",
+    "CSCO",
+    "CVX",
+    "DIS",
+    "DOW",
+    "GS",
+    "HD",
+    "HON",
+    "IBM",
+    "INTC",
+    "JNJ",
+    "JPM",
+    "KO",
+    "MCD",
+    "MMM",
+    "MRK",
+    "MSFT",
+    "NKE",
+    "PG",
+    "TRV",
+    "UNH",
+    "V",
+    "VZ",
+    "WBA",
+    "WMT",
 ]
 
 # SPDR US sector ETFs (11 sectors)
@@ -86,7 +112,5 @@ def get_universe(name: str) -> list[str]:
         "factors": list(FACTOR_ETFS.keys()),
     }
     if key not in table:
-        raise KeyError(
-            f"Unknown universe {name!r}. Available: {sorted(table.keys())}"
-        )
+        raise KeyError(f"Unknown universe {name!r}. Available: {sorted(table.keys())}")
     return list(table[key])  # defensive copy

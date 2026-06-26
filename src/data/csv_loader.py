@@ -72,9 +72,7 @@ def load_csv_ohlcv(
         raise ValueError(f"CSV is empty: {p}")
 
     # normalise column names
-    df.columns = [
-        _COL_ALIASES.get(c.strip().lower(), c.strip().lower()) for c in df.columns
-    ]
+    df.columns = [_COL_ALIASES.get(c.strip().lower(), c.strip().lower()) for c in df.columns]
 
     # date column
     if date_col is None:
@@ -101,8 +99,7 @@ def load_csv_ohlcv(
     missing = [c for c in REQUIRED_COLS if c not in df.columns]
     if missing:
         raise ValueError(
-            f"CSV is missing required columns: {missing}. "
-            f"Available: {list(df.columns)}"
+            f"CSV is missing required columns: {missing}. Available: {list(df.columns)}"
         )
 
     df = df[REQUIRED_COLS].dropna()
@@ -113,9 +110,7 @@ def load_csv_ohlcv(
         df = df[df.index <= pd.to_datetime(end)]
 
     if df.empty:
-        raise ValueError(
-            f"No rows left after applying start={start!r} / end={end!r} filters."
-        )
+        raise ValueError(f"No rows left after applying start={start!r} / end={end!r} filters.")
 
     logger.info("Loaded %d rows from %s.", len(df), p)
     return df

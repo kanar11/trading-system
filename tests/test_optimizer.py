@@ -5,8 +5,8 @@ import pandas as pd
 import pytest
 
 from src.portfolio.optimizer import (
-    min_variance_weights,
     max_sharpe_weights,
+    min_variance_weights,
     risk_parity_weights,
 )
 
@@ -14,11 +14,8 @@ from src.portfolio.optimizer import (
 def _synthetic_returns(n: int = 500, seed: int = 0) -> pd.DataFrame:
     """3-asset return panel with different vols + mild correlation."""
     rng = np.random.default_rng(seed)
-    n_assets = 3
     cov = np.array(
-        [[0.0004, 0.0001, 0.00005],
-         [0.0001, 0.0009, 0.0002],
-         [0.00005, 0.0002, 0.0016]],
+        [[0.0004, 0.0001, 0.00005], [0.0001, 0.0009, 0.0002], [0.00005, 0.0002, 0.0016]],
     )
     means = np.array([0.0005, 0.0003, 0.0008])
     samples = rng.multivariate_normal(means, cov, size=n)
@@ -28,6 +25,7 @@ def _synthetic_returns(n: int = 500, seed: int = 0) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # min_variance_weights
 # ---------------------------------------------------------------------------
+
 
 def test_min_variance_weights_sum_to_one():
     rets = _synthetic_returns()
@@ -57,6 +55,7 @@ def test_min_variance_accepts_precomputed_cov():
 # max_sharpe_weights
 # ---------------------------------------------------------------------------
 
+
 def test_max_sharpe_weights_sum_to_one():
     rets = _synthetic_returns()
     w = max_sharpe_weights(rets)
@@ -77,6 +76,7 @@ def test_max_sharpe_responds_to_rf_rate():
 # ---------------------------------------------------------------------------
 # risk_parity_weights
 # ---------------------------------------------------------------------------
+
 
 def test_risk_parity_weights_sum_to_one():
     rets = _synthetic_returns()
@@ -103,7 +103,7 @@ def test_risk_parity_diagonal_cov_matches_inverse_vol():
     )
     sigmas = np.array([0.01, 0.02, 0.04])
     rets = rets * sigmas  # rescale to known vols, zero off-diagonal cov
-    cov = np.diag(sigmas ** 2)
+    cov = np.diag(sigmas**2)
     w = risk_parity_weights(rets, cov=cov)
     expected = (1 / sigmas) / (1 / sigmas).sum()
     np.testing.assert_allclose(w.values, expected, rtol=1e-4)
@@ -112,6 +112,7 @@ def test_risk_parity_diagonal_cov_matches_inverse_vol():
 # ---------------------------------------------------------------------------
 # shared edge cases
 # ---------------------------------------------------------------------------
+
 
 def test_singular_cov_falls_back_to_equal_weights():
     # rank-deficient covariance — two identical columns

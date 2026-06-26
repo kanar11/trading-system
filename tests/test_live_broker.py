@@ -2,8 +2,8 @@
 
 import pytest
 
-from src.live.broker import Broker, PaperBroker, BrokerFill
-from src.oms import Order, OrderStatus, OrderType, Side, TimeInForce
+from src.live.broker import Broker, BrokerFill, PaperBroker
+from src.oms import Order, OrderStatus, OrderType, Side
 
 
 class TestPaperBrokerBasics:
@@ -38,8 +38,9 @@ class TestPaperBrokerBasics:
 class TestLimitOrders:
     def test_limit_does_not_fill_above_for_buy(self):
         b = PaperBroker(initial_cash=100_000)
-        o = Order(symbol="SPY", side=Side.BUY, quantity=10,
-                  order_type=OrderType.LIMIT, limit_price=400.0)
+        o = Order(
+            symbol="SPY", side=Side.BUY, quantity=10, order_type=OrderType.LIMIT, limit_price=400.0
+        )
         b.submit_order(o, mark_price=410.0)
         assert o.status is OrderStatus.WORKING
         # mark drops to 400 → fills
@@ -51,8 +52,9 @@ class TestLimitOrders:
         # we need a long position to sell from — open one first
         buy = Order(symbol="SPY", side=Side.BUY, quantity=10)
         b.submit_order(buy, mark_price=400.0)
-        sell = Order(symbol="SPY", side=Side.SELL, quantity=10,
-                     order_type=OrderType.LIMIT, limit_price=420.0)
+        sell = Order(
+            symbol="SPY", side=Side.SELL, quantity=10, order_type=OrderType.LIMIT, limit_price=420.0
+        )
         b.submit_order(sell, mark_price=410.0)
         assert sell.status is OrderStatus.WORKING
         b.poll({"SPY": 425.0})
@@ -62,8 +64,9 @@ class TestLimitOrders:
 class TestStopOrders:
     def test_stop_buy_triggers_above(self):
         b = PaperBroker(initial_cash=100_000)
-        o = Order(symbol="SPY", side=Side.BUY, quantity=10,
-                  order_type=OrderType.STOP, stop_price=410.0)
+        o = Order(
+            symbol="SPY", side=Side.BUY, quantity=10, order_type=OrderType.STOP, stop_price=410.0
+        )
         b.submit_order(o, mark_price=405.0)
         assert o.status is OrderStatus.WORKING
         b.poll({"SPY": 415.0})  # above stop
@@ -73,8 +76,9 @@ class TestStopOrders:
 class TestCancellation:
     def test_cancel_working_order(self):
         b = PaperBroker()
-        o = Order(symbol="SPY", side=Side.BUY, quantity=10,
-                  order_type=OrderType.LIMIT, limit_price=100.0)
+        o = Order(
+            symbol="SPY", side=Side.BUY, quantity=10, order_type=OrderType.LIMIT, limit_price=100.0
+        )
         b.submit_order(o, mark_price=110.0)  # too high → working
         assert b.cancel_order(o.order_id) is True
         assert o.status is OrderStatus.CANCELLED
@@ -92,10 +96,12 @@ class TestBrokerInterface:
 
     def test_open_orders_filtered_by_symbol(self):
         b = PaperBroker()
-        a = Order(symbol="AAA", side=Side.BUY, quantity=10,
-                  order_type=OrderType.LIMIT, limit_price=50)
-        bb = Order(symbol="BBB", side=Side.BUY, quantity=10,
-                   order_type=OrderType.LIMIT, limit_price=50)
+        a = Order(
+            symbol="AAA", side=Side.BUY, quantity=10, order_type=OrderType.LIMIT, limit_price=50
+        )
+        bb = Order(
+            symbol="BBB", side=Side.BUY, quantity=10, order_type=OrderType.LIMIT, limit_price=50
+        )
         b.submit_order(a, mark_price=100)
         b.submit_order(bb, mark_price=100)
         assert len(b.open_orders()) == 2

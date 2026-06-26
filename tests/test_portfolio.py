@@ -5,12 +5,12 @@ import pandas as pd
 import pytest
 
 from src.backtest.engine import backtest_strategy
-from src.strategy.momentum import momentum_strategy
 from src.portfolio.portfolio import (
     PortfolioConfig,
     PortfolioResult,
     run_portfolio_backtest,
 )
+from src.strategy.momentum import momentum_strategy
 
 
 def _make_synthetic(seed: int, n: int = 200) -> pd.DataFrame:
@@ -56,7 +56,9 @@ def test_equal_weight_runs_and_normalises():
 
 def test_inverse_vol_weights_sum_to_one():
     res = run_portfolio_backtest(
-        _basket(), _mom, _bt,
+        _basket(),
+        _mom,
+        _bt,
         PortfolioConfig(weighting="inverse_vol", vol_window=20),
     )
     # after warm-up, each row should sum to 1
@@ -66,7 +68,9 @@ def test_inverse_vol_weights_sum_to_one():
 
 def test_custom_weights_applied_and_normalised():
     res = run_portfolio_backtest(
-        _basket(), _mom, _bt,
+        _basket(),
+        _mom,
+        _bt,
         PortfolioConfig(weighting="custom", custom_weights={"AAA": 1, "BBB": 1, "CCC": 2}),
     )
     last_row = res.weights.iloc[-1]
@@ -78,14 +82,20 @@ def test_custom_weights_applied_and_normalised():
 def test_custom_weights_required():
     with pytest.raises(ValueError, match="custom_weights"):
         run_portfolio_backtest(
-            _basket(), _mom, _bt, PortfolioConfig(weighting="custom"),
+            _basket(),
+            _mom,
+            _bt,
+            PortfolioConfig(weighting="custom"),
         )
 
 
 def test_unknown_scheme_raises():
     with pytest.raises(ValueError, match="unknown weighting"):
         run_portfolio_backtest(
-            _basket(), _mom, _bt, PortfolioConfig(weighting="bogus"),
+            _basket(),
+            _mom,
+            _bt,
+            PortfolioConfig(weighting="bogus"),
         )
 
 

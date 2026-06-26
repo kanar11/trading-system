@@ -101,17 +101,10 @@ def apply_risk_controls(
 
         # --- update peak price for trailing stop ---
         if entry_price is not None and pos_dir != 0:
-            if pos_dir > 0:
-                peak_price = max(peak_price, price)
-            else:
-                peak_price = min(peak_price, price)
+            peak_price = max(peak_price, price) if pos_dir > 0 else min(peak_price, price)
 
         # --- check stop-loss ---
-        if (
-            config.stop_loss is not None
-            and entry_price is not None
-            and pos_dir != 0
-        ):
+        if config.stop_loss is not None and entry_price is not None and pos_dir != 0:
             if pos_dir > 0:
                 unrealised = (price - entry_price) / entry_price
             else:
@@ -126,11 +119,7 @@ def apply_risk_controls(
                 continue
 
         # --- check take-profit ---
-        if (
-            config.take_profit is not None
-            and entry_price is not None
-            and pos_dir != 0
-        ):
+        if config.take_profit is not None and entry_price is not None and pos_dir != 0:
             if pos_dir > 0:
                 unrealised = (price - entry_price) / entry_price
             else:
@@ -145,11 +134,7 @@ def apply_risk_controls(
                 continue
 
         # --- check trailing stop ---
-        if (
-            config.trailing_stop is not None
-            and peak_price is not None
-            and pos_dir != 0
-        ):
+        if config.trailing_stop is not None and peak_price is not None and pos_dir != 0:
             if pos_dir > 0:
                 drawdown = (peak_price - price) / peak_price
             else:

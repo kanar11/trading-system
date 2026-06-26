@@ -1,24 +1,22 @@
 """Tests for the statistical-significance test module."""
 
-import math
-
 import numpy as np
 import pandas as pd
 import pytest
 
 from src.validation.stat_tests import (
     SharpeTestResult,
-    sharpe_ttest,
-    probabilistic_sharpe_ratio,
-    deflated_sharpe_ratio,
     _norm_cdf,
     _norm_quantile,
+    deflated_sharpe_ratio,
+    probabilistic_sharpe_ratio,
+    sharpe_ttest,
 )
-
 
 # ---------------------------------------------------------------------------
 # helpers: erf-based normal CDF & Acklam inverse
 # ---------------------------------------------------------------------------
+
 
 def test_norm_cdf_midpoint_is_half():
     assert _norm_cdf(0.0) == pytest.approx(0.5, abs=1e-12)
@@ -46,6 +44,7 @@ def test_norm_quantile_out_of_range_raises():
 # sharpe_ttest
 # ---------------------------------------------------------------------------
 
+
 def test_sharpe_ttest_zero_returns():
     res = sharpe_ttest(pd.Series(np.zeros(100)))
     assert isinstance(res, SharpeTestResult)
@@ -71,6 +70,7 @@ def test_sharpe_ttest_too_few_observations():
 # ---------------------------------------------------------------------------
 # probabilistic_sharpe_ratio
 # ---------------------------------------------------------------------------
+
 
 def test_psr_at_target_equal_to_realised_is_half():
     np.random.seed(1)
@@ -100,6 +100,7 @@ def test_psr_returns_in_unit_interval():
 # ---------------------------------------------------------------------------
 # deflated_sharpe_ratio
 # ---------------------------------------------------------------------------
+
 
 def test_dsr_with_one_trial_matches_psr_against_zero():
     np.random.seed(4)

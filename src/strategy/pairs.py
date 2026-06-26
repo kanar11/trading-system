@@ -105,14 +105,14 @@ def _adf_t_stat(series: np.ndarray, max_lag: int = 1) -> float:
     y = ds[max_lag:]
     cols = [s[max_lag:-1]]  # s_{t-1}
     for lag in range(1, max_lag + 1):
-        cols.append(ds[max_lag - lag:-lag])
+        cols.append(ds[max_lag - lag : -lag])
     X = np.column_stack(cols)
 
     # OLS via lstsq
     coefs, *_ = np.linalg.lstsq(X, y, rcond=None)
     residuals = y - X @ coefs
     dof = max(len(y) - X.shape[1], 1)
-    sigma2 = float((residuals ** 2).sum() / dof)
+    sigma2 = float((residuals**2).sum() / dof)
     try:
         xtx_inv = np.linalg.inv(X.T @ X)
     except np.linalg.LinAlgError:
@@ -222,7 +222,7 @@ def pairs_trading_signal(
             if zi >= z_entry:
                 state = -1  # spread too high → short the spread
             elif zi <= -z_entry:
-                state = 1   # spread too low → long the spread
+                state = 1  # spread too low → long the spread
         else:
             if abs(zi) <= z_exit:
                 state = 0

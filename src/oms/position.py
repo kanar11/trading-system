@@ -12,7 +12,7 @@ on the closing portion and reopening the remainder at the new price.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from src.oms.order import Side
 
@@ -93,7 +93,11 @@ class Position:
         signed_qty = side.signed * fill_qty
         realised_delta = 0.0
 
-        if self.is_flat or (self.quantity > 0 and signed_qty > 0) or (self.quantity < 0 and signed_qty < 0):
+        if (
+            self.is_flat
+            or (self.quantity > 0 and signed_qty > 0)
+            or (self.quantity < 0 and signed_qty < 0)
+        ):
             # opening or adding in the same direction
             new_qty = self.quantity + signed_qty
             # weighted-average price by absolute quantity

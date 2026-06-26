@@ -1,20 +1,20 @@
 """Tests for the regime detection module."""
 
+from functools import partial
+
 import numpy as np
 import pandas as pd
-import pytest
 
 from src.regime.detector import (
     RegimeConfig,
     RegimeType,
-    detect_regime,
-    adaptive_strategy,
     _adx,
     _rolling_hurst,
+    adaptive_strategy,
+    detect_regime,
 )
-from src.strategy.momentum import momentum_strategy
 from src.strategy.mean_reversion import mean_reversion_strategy
-from functools import partial
+from src.strategy.momentum import momentum_strategy
 
 
 def _make_ohlc_df(n: int = 300, trend: bool = True) -> pd.DataFrame:

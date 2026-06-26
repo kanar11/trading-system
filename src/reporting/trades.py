@@ -31,8 +31,10 @@ def build_trade_log(result: pd.DataFrame) -> pd.DataFrame:
     df = result.copy()
 
     if "pos" not in df.columns:
-        raise ValueError("DataFrame must contain a 'pos' column. "
-                         "For backtest results use the trade log from backtest_strategy().")
+        raise ValueError(
+            "DataFrame must contain a 'pos' column. "
+            "For backtest results use the trade log from backtest_strategy()."
+        )
 
     pos = df["pos"].astype(int)
     prev_pos = pos.shift(1).fillna(0).astype(int)
@@ -52,14 +54,16 @@ def build_trade_log(result: pd.DataFrame) -> pd.DataFrame:
         # close existing trade
         if current_pos != 0 and entry_price is not None:
             trade_return = current_pos * (price / entry_price - 1.0)
-            trades.append({
-                "entry_date": entry_date,
-                "exit_date": dt,
-                "direction": current_pos,
-                "entry_price": entry_price,
-                "exit_price": price,
-                "trade_return": trade_return,
-            })
+            trades.append(
+                {
+                    "entry_date": entry_date,
+                    "exit_date": dt,
+                    "direction": current_pos,
+                    "entry_price": entry_price,
+                    "exit_price": price,
+                    "trade_return": trade_return,
+                }
+            )
             entry_date = None
             entry_price = None
 
@@ -76,20 +80,20 @@ def build_trade_log(result: pd.DataFrame) -> pd.DataFrame:
         last_date = df.index[-1]
         last_price = float(df["close"].iloc[-1])
         trade_return = current_pos * (last_price / entry_price - 1.0)
-        trades.append({
-            "entry_date": entry_date,
-            "exit_date": last_date,
-            "direction": current_pos,
-            "entry_price": entry_price,
-            "exit_price": last_price,
-            "trade_return": trade_return,
-        })
+        trades.append(
+            {
+                "entry_date": entry_date,
+                "exit_date": last_date,
+                "direction": current_pos,
+                "entry_price": entry_price,
+                "exit_price": last_price,
+                "trade_return": trade_return,
+            }
+        )
 
     trade_df = pd.DataFrame(trades)
 
     if not trade_df.empty:
-        trade_df["holding_days"] = (
-            trade_df["exit_date"] - trade_df["entry_date"]
-        ).dt.days
+        trade_df["holding_days"] = (trade_df["exit_date"] - trade_df["entry_date"]).dt.days
 
     return trade_df

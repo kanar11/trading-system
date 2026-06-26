@@ -5,15 +5,20 @@ import pandas as pd
 import pytest
 
 from src.data.cache import CachedLoader, _make_key
-from src.data.resample import resample_ohlcv, to_daily, to_weekly, to_monthly
+from src.data.resample import resample_ohlcv, to_daily, to_monthly, to_weekly
 from src.data.universe import (
-    FAANG, DOW30, SECTOR_ETFS, BENCHMARKS, FACTOR_ETFS, get_universe,
+    BENCHMARKS,
+    DOW30,
+    FAANG,
+    FACTOR_ETFS,
+    SECTOR_ETFS,
+    get_universe,
 )
-
 
 # ---------------------------------------------------------------------------
 # cache
 # ---------------------------------------------------------------------------
+
 
 class TestCache:
     def test_cache_hit_skips_loader(self, tmp_path):
@@ -23,7 +28,8 @@ class TestCache:
             call_count[0] += 1
             dates = pd.date_range("2020-01-01", periods=5, freq="B")
             return pd.DataFrame(
-                {"close": [100, 101, 102, 103, 104]}, index=dates,
+                {"close": [100, 101, 102, 103, 104]},
+                index=dates,
             )
 
         loader = CachedLoader(fake_loader, cache_dir=tmp_path)
@@ -91,6 +97,7 @@ class TestCache:
 # resample
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def minute_ohlcv():
     """1-minute bars for ~6 trading hours."""
@@ -152,6 +159,7 @@ class TestResample:
 # ---------------------------------------------------------------------------
 # universe
 # ---------------------------------------------------------------------------
+
 
 class TestUniverse:
     def test_constants_non_empty(self):

@@ -1,14 +1,14 @@
 """Multi-asset portfolio backtest and weight optimisation."""
 
+from src.portfolio.optimizer import (
+    max_sharpe_weights,
+    min_variance_weights,
+    risk_parity_weights,
+)
 from src.portfolio.portfolio import (
     PortfolioConfig,
-    run_portfolio_backtest,
     PortfolioResult,
-)
-from src.portfolio.optimizer import (
-    min_variance_weights,
-    max_sharpe_weights,
-    risk_parity_weights,
+    run_portfolio_backtest,
 )
 
 __all__ = [

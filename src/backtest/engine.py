@@ -9,9 +9,9 @@ import logging
 import numpy as np
 import pandas as pd
 
-logger = logging.getLogger(__name__)
-
 from src.risk.manager import RiskConfig, apply_risk_controls
+
+logger = logging.getLogger(__name__)
 
 
 def backtest_strategy(
@@ -53,9 +53,7 @@ def backtest_strategy(
 
     # volatility targeting
     if vol_target is not None:
-        df["realized_vol"] = (
-            df["market_returns"].rolling(vol_window).std() * np.sqrt(252)
-        )
+        df["realized_vol"] = df["market_returns"].rolling(vol_window).std() * np.sqrt(252)
         df["vol_scalar"] = (vol_target / df["realized_vol"]).clip(upper=3.0).fillna(0)
         df["scaled_position"] = df["position"] * df["vol_scalar"]
     else:

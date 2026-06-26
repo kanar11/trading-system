@@ -23,11 +23,11 @@ from __future__ import annotations
 import itertools
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Mapping, Optional
 
-from src.oms import Order, OrderStatus, OrderType, Side, TimeInForce, Portfolio
+from src.oms import Order, OrderStatus, OrderType, Portfolio, Side
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,7 @@ class Broker(ABC):
         """Cancel an outstanding order. Returns True if cancelled, False if already terminal."""
 
     @abstractmethod
-    def open_orders(self, symbol: Optional[str] = None) -> list[Order]:
+    def open_orders(self, symbol: str | None = None) -> list[Order]:
         """Return all currently-active orders, optionally filtered by symbol."""
 
     @abstractmethod
@@ -103,7 +103,7 @@ class PaperBroker(Broker):
 
     # --- Broker interface -------------------------------------------------
 
-    def submit_order(self, order: Order, mark_price: Optional[float] = None) -> Order:
+    def submit_order(self, order: Order, mark_price: float | None = None) -> Order:
         """Submit and immediately attempt to fill ``order`` at ``mark_price``.
 
         Args:
@@ -134,9 +134,10 @@ class PaperBroker(Broker):
         order.cancel()
         return True
 
-    def open_orders(self, symbol: Optional[str] = None) -> list[Order]:
+    def open_orders(self, symbol: str | None = None) -> list[Order]:
         return [
-            o for o in self._orders.values()
+            o
+            for o in self._orders.values()
             if o.status.is_active and (symbol is None or o.symbol == symbol)
         ]
 
@@ -176,21 +177,20 @@ class PaperBroker(Broker):
 
     # --- internals --------------------------------------------------------
 
-    def _try_fill(self, order: Order, mark: float) -> Optional[BrokerFill]:
+    def _try_fill(self, order: Order, mark: float) -> BrokerFill | None:
         """Attempt to fill ``order`` at ``mark``. Returns a BrokerFill on success."""
         if order.order_type is OrderType.MARKET:
             fill_price = mark
         elif order.order_type is OrderType.LIMIT:
-            if order.side is Side.BUY and mark <= order.limit_price:
-                fill_price = order.limit_price
-            elif order.side is Side.SELL and mark >= order.limit_price:
+            if (order.side is Side.BUY and mark <= order.limit_price) or (
+                order.side is Side.SELL and mark >= order.limit_price
+            ):
                 fill_price = order.limit_price
             else:
                 return None
         elif order.order_type is OrderType.STOP:
-            triggered = (
-                (order.side is Side.BUY and mark >= order.stop_price)
-                or (order.side is Side.SELL and mark <= order.stop_price)
+            triggered = (order.side is Side.BUY and mark >= order.stop_price) or (
+                order.side is Side.SELL and mark <= order.stop_price
             )
             if not triggered:
                 return None
@@ -203,12 +203,19 @@ class PaperBroker(Broker):
         commission = qty * self.commission_per_share
         order.record_fill(qty, fill_price)
         self._portfolio.record_fill(
-            symbol=order.symbol, side=order.side, quantity=qty,
-            price=fill_price, commission=commission,
+            symbol=order.symbol,
+            side=order.side,
+            quantity=qty,
+            price=fill_price,
+            commission=commission,
         )
         fill = BrokerFill(
-            order_id=order.order_id, symbol=order.symbol, side=order.side,
-            quantity=qty, price=fill_price, commission=commission,
+            order_id=order.order_id,
+            symbol=order.symbol,
+            side=order.side,
+            quantity=qty,
+            price=fill_price,
+            commission=commission,
             when=datetime.utcnow(),
         )
         self.fills.append(fill)

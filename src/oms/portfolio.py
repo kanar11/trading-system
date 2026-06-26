@@ -12,9 +12,9 @@ event engine to get a full trading harness.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Mapping
 
 from src.oms.order import Side
 from src.oms.position import Position
@@ -58,26 +58,14 @@ class Portfolio:
         return sum(p.realized_pnl for p in self.positions.values())
 
     def total_unrealized_pnl(self, marks: Mapping[str, float]) -> float:
-        return sum(
-            p.unrealized_pnl(marks[s])
-            for s, p in self.positions.items()
-            if s in marks
-        )
+        return sum(p.unrealized_pnl(marks[s]) for s, p in self.positions.items() if s in marks)
 
     def gross_exposure(self, marks: Mapping[str, float]) -> float:
         """Sum of absolute market values across all positions."""
-        return sum(
-            abs(p.market_value(marks[s]))
-            for s, p in self.positions.items()
-            if s in marks
-        )
+        return sum(abs(p.market_value(marks[s])) for s, p in self.positions.items() if s in marks)
 
     def net_exposure(self, marks: Mapping[str, float]) -> float:
-        return sum(
-            p.market_value(marks[s])
-            for s, p in self.positions.items()
-            if s in marks
-        )
+        return sum(p.market_value(marks[s]) for s, p in self.positions.items() if s in marks)
 
     def equity(self, marks: Mapping[str, float]) -> float:
         """Cash + sum of position market values."""

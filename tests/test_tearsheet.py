@@ -1,6 +1,7 @@
 """Tests for the tear-sheet generator."""
 
 import matplotlib
+
 matplotlib.use("Agg")  # headless backend for CI
 
 import numpy as np
@@ -39,12 +40,13 @@ def test_with_benchmark_and_trade_log(daily_returns, tmp_path):
         rng.normal(0.0003, 0.010, len(daily_returns)),
         index=daily_returns.index,
     )
-    trade_log = pd.DataFrame(
-        {"trade_return": rng.normal(0.005, 0.02, 30), "direction": [1] * 30}
-    )
+    trade_log = pd.DataFrame({"trade_return": rng.normal(0.005, 0.02, 30), "direction": [1] * 30})
     out = tmp_path / "ts.png"
     fig = generate_tearsheet(
-        daily_returns, benchmark=benchmark, trade_log=trade_log, output_path=out,
+        daily_returns,
+        benchmark=benchmark,
+        trade_log=trade_log,
+        output_path=out,
     )
     assert out.exists()
     assert isinstance(fig, Figure)

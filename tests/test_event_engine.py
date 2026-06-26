@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.backtest.event_engine import EventEngine, Context, EventEngineResult
-from src.oms import Side, OrderType, OrderStatus
+from src.backtest.event_engine import Context, EventEngine, EventEngineResult
+from src.oms import OrderStatus, OrderType, Side
 
 
 def _ohlc(prices: list[float]) -> pd.DataFrame:
@@ -26,6 +26,7 @@ def _ohlc(prices: list[float]) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # strategies used as fixtures
 # ---------------------------------------------------------------------------
+
 
 class BuyOnceStrategy:
     """Submit a single market BUY on the first bar; sit tight after."""
@@ -55,7 +56,10 @@ class BuyAndExitStrategy:
             self._bought = True
         elif not self._exit_submitted:
             ctx.submit_order(
-                Side.SELL, self.qty, order_type=OrderType.LIMIT, limit_price=self.exit_at,
+                Side.SELL,
+                self.qty,
+                order_type=OrderType.LIMIT,
+                limit_price=self.exit_at,
             )
             self._exit_submitted = True
 
@@ -75,7 +79,10 @@ class StopLossStrategy:
             self._bought = True
         elif not self._stop_submitted:
             ctx.submit_order(
-                Side.SELL, self.qty, order_type=OrderType.STOP, stop_price=self.stop,
+                Side.SELL,
+                self.qty,
+                order_type=OrderType.STOP,
+                stop_price=self.stop,
             )
             self._stop_submitted = True
 
@@ -88,6 +95,7 @@ class DoNothingStrategy:
 # ---------------------------------------------------------------------------
 # engine sanity
 # ---------------------------------------------------------------------------
+
 
 def test_engine_runs_with_no_trades():
     df = _ohlc([100, 101, 102, 103])
@@ -108,6 +116,7 @@ def test_engine_validates_columns():
 # ---------------------------------------------------------------------------
 # market order behaviour
 # ---------------------------------------------------------------------------
+
 
 def test_market_buy_fills_on_next_bar_open():
     df = _ohlc([100, 105, 110])
@@ -133,8 +142,10 @@ def test_market_buy_equity_accounting():
 def test_commission_charged():
     df = _ohlc([100, 100, 100])
     eng = EventEngine(
-        symbol="ASSET", initial_cash=10_000,
-        commission_per_share=0.01, commission_min=1.0,
+        symbol="ASSET",
+        initial_cash=10_000,
+        commission_per_share=0.01,
+        commission_min=1.0,
     )
     res = eng.run(df, BuyOnceStrategy(qty=10))
     # commission = max(10 * 0.01, 1.0) = 1.0
@@ -153,6 +164,7 @@ def test_slippage_increases_buy_price():
 # ---------------------------------------------------------------------------
 # limit order behaviour
 # ---------------------------------------------------------------------------
+
 
 def test_limit_sell_fills_when_high_touches_limit():
     # bar prices: 100 → 105 (high 106.05) → 115 (high 116.15)
@@ -184,6 +196,7 @@ def test_limit_does_not_fill_if_price_out_of_reach():
 # stop order behaviour
 # ---------------------------------------------------------------------------
 
+
 def test_stop_loss_triggers_on_breach():
     # closes: 100, 100, 90, 85 — bar 2 has low=90*0.99=89.1, triggers stop@95
     df = _ohlc([100, 100, 90, 85])
@@ -206,6 +219,7 @@ def test_stop_does_not_trigger_above_stop():
 # ---------------------------------------------------------------------------
 # state tracking
 # ---------------------------------------------------------------------------
+
 
 def test_equity_curve_reflects_unrealised_pnl():
     df = _ohlc([100, 100, 120, 120])
@@ -236,7 +250,10 @@ def test_cancel_all_returns_count():
         def on_bar(self, ctx):
             if self._step == 0:
                 ctx.submit_order(
-                    Side.BUY, 10, order_type=OrderType.LIMIT, limit_price=50,
+                    Side.BUY,
+                    10,
+                    order_type=OrderType.LIMIT,
+                    limit_price=50,
                 )  # never fills
             if self._step == 1:
                 ctx.cancel_all()

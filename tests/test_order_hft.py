@@ -6,13 +6,20 @@ fill audit trail, monotonic timestamps, structured rejects, amend
 (cancel-replace), float-drift-safe averaging and FIX-aligned accessors.
 """
 
+import dataclasses
 from datetime import datetime, timedelta
 
 import pytest
 
 from src.oms import (
-    Order, OrderStatus, OrderType, Side, TimeInForce,
-    RejectReason, Liquidity, Fill, IllegalOrderTransition,
+    Fill,
+    IllegalOrderTransition,
+    Liquidity,
+    Order,
+    OrderStatus,
+    OrderType,
+    RejectReason,
+    Side,
 )
 
 
@@ -23,6 +30,7 @@ def _mkt(qty=100):
 # ---------------------------------------------------------------------------
 # strict state machine
 # ---------------------------------------------------------------------------
+
 
 class TestStateMachine:
     def test_fill_after_cancel_raises(self):
@@ -62,6 +70,7 @@ class TestStateMachine:
 # sequenced, immutable, tuple-compatible fills
 # ---------------------------------------------------------------------------
 
+
 class TestFillAuditTrail:
     def test_fills_are_sequenced(self):
         o = _mkt(100)
@@ -74,7 +83,7 @@ class TestFillAuditTrail:
         o = _mkt(10)
         o.record_fill(10, 100.0)
         f = o.fills[0]
-        with pytest.raises(Exception):  # FrozenInstanceError (dataclass frozen)
+        with pytest.raises(dataclasses.FrozenInstanceError):
             f.price = 999.0
 
     def test_fill_tuple_unpacking_backcompat(self):
@@ -106,6 +115,7 @@ class TestFillAuditTrail:
 # monotonic timestamps
 # ---------------------------------------------------------------------------
 
+
 class TestMonotonicTimestamps:
     def test_out_of_order_fill_rejected(self):
         o = _mkt(100)
@@ -125,6 +135,7 @@ class TestMonotonicTimestamps:
 # ---------------------------------------------------------------------------
 # float-drift-safe average price
 # ---------------------------------------------------------------------------
+
 
 class TestAveragePrice:
     def test_avg_price_weighted(self):
@@ -146,6 +157,7 @@ class TestAveragePrice:
 # FIX-aligned accessors
 # ---------------------------------------------------------------------------
 
+
 class TestFixAliases:
     def test_cum_and_leaves_qty(self):
         o = _mkt(100)
@@ -163,6 +175,7 @@ class TestFixAliases:
 # ---------------------------------------------------------------------------
 # structured rejects
 # ---------------------------------------------------------------------------
+
 
 class TestReject:
     def test_reject_with_enum_reason(self):
@@ -194,6 +207,7 @@ class TestReject:
 # amend (cancel-replace)
 # ---------------------------------------------------------------------------
 
+
 class TestAmend:
     def test_amend_quantity_bumps_version(self):
         o = _mkt(100)
@@ -215,8 +229,9 @@ class TestAmend:
         assert o.status is OrderStatus.FILLED
 
     def test_amend_limit_price(self):
-        o = Order(symbol="SPY", side=Side.BUY, quantity=10,
-                  order_type=OrderType.LIMIT, limit_price=400.0)
+        o = Order(
+            symbol="SPY", side=Side.BUY, quantity=10, order_type=OrderType.LIMIT, limit_price=400.0
+        )
         o.amend(new_limit_price=395.0)
         assert o.limit_price == 395.0
 
@@ -235,6 +250,7 @@ class TestAmend:
 # ---------------------------------------------------------------------------
 # serialisation
 # ---------------------------------------------------------------------------
+
 
 class TestSerialization:
     def test_to_dict_has_fix_fields(self):

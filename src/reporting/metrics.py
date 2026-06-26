@@ -7,10 +7,10 @@ trade-level analytics (from a trade log DataFrame).
 import numpy as np
 import pandas as pd
 
-
 # ---------------------------------------------------------------------------
 # Portfolio-level metrics
 # ---------------------------------------------------------------------------
+
 
 def calculate_metrics(strategy_returns: pd.Series) -> dict[str, float]:
     """Compute core performance statistics from a daily return series.
@@ -42,22 +42,14 @@ def calculate_metrics(strategy_returns: pd.Series) -> dict[str, float]:
     cagr = (equity_curve.iloc[-1] ** (1 / years) - 1) if years > 0 else 0.0
 
     volatility = strategy_returns.std()
-    sharpe = (
-        (strategy_returns.mean() / volatility) * np.sqrt(252)
-        if volatility > 0
-        else 0.0
-    )
+    sharpe = (strategy_returns.mean() / volatility) * np.sqrt(252) if volatility > 0 else 0.0
 
     # Sortino — downside deviation only
     downside = strategy_returns[strategy_returns < 0]
     downside_std = downside.std() if len(downside) > 1 else 0.0
     if pd.isna(downside_std):
         downside_std = 0.0
-    sortino = (
-        (strategy_returns.mean() / downside_std) * np.sqrt(252)
-        if downside_std > 0
-        else 0.0
-    )
+    sortino = (strategy_returns.mean() / downside_std) * np.sqrt(252) if downside_std > 0 else 0.0
 
     # drawdown
     rolling_max = equity_curve.cummax()
@@ -80,6 +72,7 @@ def calculate_metrics(strategy_returns: pd.Series) -> dict[str, float]:
 # ---------------------------------------------------------------------------
 # Trade-level analytics
 # ---------------------------------------------------------------------------
+
 
 def calculate_trade_stats(trade_log: pd.DataFrame) -> dict[str, float | int]:
     """Compute trade-level statistics from a trade log.
@@ -137,13 +130,9 @@ def calculate_trade_stats(trade_log: pd.DataFrame) -> dict[str, float | int]:
     if "holding_days" in trade_log.columns:
         avg_holding = float(trade_log["holding_days"].mean())
         if n_win > 0:
-            avg_holding_win = float(
-                trade_log.loc[returns > 0, "holding_days"].mean()
-            )
+            avg_holding_win = float(trade_log.loc[returns > 0, "holding_days"].mean())
         if n_loss > 0:
-            avg_holding_loss = float(
-                trade_log.loc[returns < 0, "holding_days"].mean()
-            )
+            avg_holding_loss = float(trade_log.loc[returns < 0, "holding_days"].mean())
 
     # direction breakdown
     n_long = 0

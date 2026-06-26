@@ -5,9 +5,9 @@ import pandas as pd
 import pytest
 
 from src.strategy.pairs import (
+    CointegrationResult,
     engle_granger_test,
     pairs_trading_signal,
-    CointegrationResult,
 )
 
 
@@ -42,6 +42,7 @@ def _independent_pair(n: int = 500, seed: int = 0):
 # engle_granger_test
 # ---------------------------------------------------------------------------
 
+
 def test_engle_granger_returns_dataclass():
     y, x = _cointegrated_pair()
     res = engle_granger_test(y, x)
@@ -75,6 +76,7 @@ def test_engle_granger_raises_on_short_series():
 # ---------------------------------------------------------------------------
 # pairs_trading_signal
 # ---------------------------------------------------------------------------
+
 
 def test_pairs_signal_returns_engine_compatible_frame():
     y, x = _cointegrated_pair(n=800, seed=1)

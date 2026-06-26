@@ -31,13 +31,11 @@ from __future__ import annotations
 import itertools
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Callable, Optional, Protocol
+from typing import Protocol
 
-import numpy as np
 import pandas as pd
 
-from src.oms import Order, OrderStatus, OrderType, Side, TimeInForce, Portfolio
+from src.oms import Order, OrderStatus, OrderType, Portfolio, Side, TimeInForce
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +49,7 @@ class StrategyProtocol(Protocol):
     the full protocol can just implement ``on_bar``.
     """
 
-    def on_bar(self, ctx: "Context") -> None: ...
+    def on_bar(self, ctx: Context) -> None: ...
 
 
 @dataclass
@@ -71,7 +69,7 @@ class Context:
     bar: pd.Series
     history: pd.DataFrame
     portfolio: Portfolio
-    engine: "EventEngine"
+    engine: EventEngine
     symbol: str
 
     def submit_order(
@@ -79,15 +77,20 @@ class Context:
         side: Side,
         quantity: float,
         order_type: OrderType = OrderType.MARKET,
-        limit_price: Optional[float] = None,
-        stop_price: Optional[float] = None,
+        limit_price: float | None = None,
+        stop_price: float | None = None,
         tif: TimeInForce = TimeInForce.DAY,
-        client_tag: Optional[str] = None,
+        client_tag: str | None = None,
     ) -> Order:
         return self.engine.submit_order(
-            symbol=self.symbol, side=side, quantity=quantity,
-            order_type=order_type, limit_price=limit_price, stop_price=stop_price,
-            tif=tif, client_tag=client_tag,
+            symbol=self.symbol,
+            side=side,
+            quantity=quantity,
+            order_type=order_type,
+            limit_price=limit_price,
+            stop_price=stop_price,
+            tif=tif,
+            client_tag=client_tag,
         )
 
     def cancel_all(self) -> int:
@@ -132,7 +135,7 @@ class EventEngine:
     slippage_bps: float = 0.0
     _next_order_id: itertools.count = field(default_factory=lambda: itertools.count(1))
     _orders: list[Order] = field(default_factory=list)
-    _portfolio: Optional[Portfolio] = None
+    _portfolio: Portfolio | None = None
 
     # -----------------------------------------------------------------
     # Public API
@@ -150,14 +153,19 @@ class EventEngine:
         side: Side,
         quantity: float,
         order_type: OrderType = OrderType.MARKET,
-        limit_price: Optional[float] = None,
-        stop_price: Optional[float] = None,
+        limit_price: float | None = None,
+        stop_price: float | None = None,
         tif: TimeInForce = TimeInForce.DAY,
-        client_tag: Optional[str] = None,
+        client_tag: str | None = None,
     ) -> Order:
         order = Order(
-            symbol=symbol, side=side, quantity=quantity, order_type=order_type,
-            limit_price=limit_price, stop_price=stop_price, time_in_force=tif,
+            symbol=symbol,
+            side=side,
+            quantity=quantity,
+            order_type=order_type,
+            limit_price=limit_price,
+            stop_price=stop_price,
+            time_in_force=tif,
             client_tag=client_tag,
         )
         order.order_id = next(self._next_order_id)
@@ -165,7 +173,7 @@ class EventEngine:
         self._orders.append(order)
         return order
 
-    def cancel_all(self, symbol: Optional[str] = None) -> int:
+    def cancel_all(self, symbol: str | None = None) -> int:
         """Cancel all active orders, optionally filtered by symbol. Returns count cancelled."""
         n = 0
         for o in self._orders:
@@ -213,23 +221,31 @@ class EventEngine:
 
             # 3. let the strategy place new orders for the next bar
             ctx = Context(
-                ts=ts, bar=bar, history=df.iloc[: i + 1],
-                portfolio=portfolio, engine=self, symbol=self.symbol,
+                ts=ts,
+                bar=bar,
+                history=df.iloc[: i + 1],
+                portfolio=portfolio,
+                engine=self,
+                symbol=self.symbol,
             )
             strategy.on_bar(ctx)
 
             # 4. end-of-day DAY-TIF expiry (all DAY orders cancel on bar close)
             #    (in this minimal single-bar-per-day engine, "end of day" = end of bar)
             for o in self._orders:
-                if o.status.is_active and o.time_in_force is TimeInForce.DAY:
-                    # only cancel orders submitted BEFORE this bar — newly submitted
-                    # orders should live to the next bar
-                    if o.last_fill_at is None and o.order_id is not None:
-                        # heuristic: order was active at start of this bar if it has
-                        # at least one fill or was visible to the matcher already.
-                        # We use a simpler rule: orders just submitted in step 3 retain
-                        # PENDING_WORKING status. We tag them with `_submitted_at_ts`.
-                        pass  # handled implicitly via next-bar matching
+                # only cancel orders submitted BEFORE this bar — newly submitted
+                # orders should live to the next bar
+                if (
+                    o.status.is_active
+                    and o.time_in_force is TimeInForce.DAY
+                    and o.last_fill_at is None
+                    and o.order_id is not None
+                ):
+                    # heuristic: order was active at start of this bar if it has
+                    # at least one fill or was visible to the matcher already.
+                    # We use a simpler rule: orders just submitted in step 3 retain
+                    # PENDING_WORKING status. We tag them with `_submitted_at_ts`.
+                    pass  # handled implicitly via next-bar matching
 
         equity_curve = pd.Series(
             data=[eq for _, eq in portfolio.equity_history],
@@ -239,8 +255,11 @@ class EventEngine:
         returns = equity_curve.pct_change().fillna(0).rename("returns")
         fills = self._build_fill_log()
         return EventEngineResult(
-            equity_curve=equity_curve, returns=returns,
-            portfolio=portfolio, orders=list(self._orders), fills=fills,
+            equity_curve=equity_curve,
+            returns=returns,
+            portfolio=portfolio,
+            orders=list(self._orders),
+            fills=fills,
         )
 
     # -----------------------------------------------------------------
@@ -265,7 +284,7 @@ class EventEngine:
             if order.symbol != self.symbol:
                 continue
 
-            fill_price: Optional[float] = None
+            fill_price: float | None = None
 
             if order.order_type is OrderType.MARKET:
                 fill_price = open_p
@@ -281,9 +300,8 @@ class EventEngine:
             elif order.order_type is OrderType.STOP:
                 # buy STOP triggers when price rises through stop_price
                 # sell STOP triggers when price falls through stop_price
-                triggered = (
-                    (order.side is Side.BUY and high_p >= order.stop_price)
-                    or (order.side is Side.SELL and low_p <= order.stop_price)
+                triggered = (order.side is Side.BUY and high_p >= order.stop_price) or (
+                    order.side is Side.SELL and low_p <= order.stop_price
                 )
                 if triggered:
                     # convert to market, fill at max(open, stop) for buy / min for sell
@@ -293,16 +311,15 @@ class EventEngine:
                         fill_price = min(open_p, order.stop_price)
 
             elif order.order_type is OrderType.STOP_LIMIT:
-                triggered = (
-                    (order.side is Side.BUY and high_p >= order.stop_price)
-                    or (order.side is Side.SELL and low_p <= order.stop_price)
+                triggered = (order.side is Side.BUY and high_p >= order.stop_price) or (
+                    order.side is Side.SELL and low_p <= order.stop_price
                 )
-                if triggered:
-                    # behave as LIMIT post-trigger
-                    if order.side is Side.BUY and low_p <= order.limit_price:
-                        fill_price = order.limit_price
-                    elif order.side is Side.SELL and high_p >= order.limit_price:
-                        fill_price = order.limit_price
+                # behave as LIMIT post-trigger
+                if triggered and (
+                    (order.side is Side.BUY and low_p <= order.limit_price)
+                    or (order.side is Side.SELL and high_p >= order.limit_price)
+                ):
+                    fill_price = order.limit_price
 
             if fill_price is None:
                 continue
@@ -315,20 +332,27 @@ class EventEngine:
                 fill_price *= 1 - slip
 
             fill_qty = order.remaining_quantity
-            commission = max(
-                fill_qty * self.commission_per_share, self.commission_min,
-            ) if (self.commission_per_share > 0 or self.commission_min > 0) else 0.0
+            commission = (
+                max(
+                    fill_qty * self.commission_per_share,
+                    self.commission_min,
+                )
+                if (self.commission_per_share > 0 or self.commission_min > 0)
+                else 0.0
+            )
 
             # LIMIT orders rest in the book → they earn the maker side;
             # MARKET / STOP / STOP_LIMIT cross the spread → taker.
             from src.oms import Liquidity
-            liquidity = (
-                Liquidity.MAKER if order.order_type is OrderType.LIMIT else Liquidity.TAKER
-            )
+
+            liquidity = Liquidity.MAKER if order.order_type is OrderType.LIMIT else Liquidity.TAKER
             order.record_fill(fill_qty, fill_price, when=ts, liquidity=liquidity)
             self.portfolio.record_fill(
-                symbol=order.symbol, side=order.side, quantity=fill_qty,
-                price=fill_price, commission=commission,
+                symbol=order.symbol,
+                side=order.side,
+                quantity=fill_qty,
+                price=fill_price,
+                commission=commission,
             )
 
     def _build_fill_log(self) -> pd.DataFrame:

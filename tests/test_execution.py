@@ -4,17 +4,17 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from src.backtest.engine import backtest_strategy
 from src.execution.slippage import (
     ExecutionConfig,
-    compute_execution_cost,
     apply_execution_costs,
+    compute_execution_cost,
 )
-from src.backtest.engine import backtest_strategy
-
 
 # ---------------------------------------------------------------------------
 # compute_execution_cost
 # ---------------------------------------------------------------------------
+
 
 def test_no_trade_no_cost():
     cfg = ExecutionConfig(spread_bps=10, impact_coeff=0.5, fixed_cost_per_trade=0.001)
@@ -31,8 +31,11 @@ def test_spread_only_at_tiny_size():
 def test_impact_sqrt_law():
     # impact = coeff * (size / cap) ** 0.5 — quadrupling size doubles impact
     cfg = ExecutionConfig(
-        spread_bps=0, impact_coeff=0.10, impact_exponent=0.5,
-        participation_cap=1.0, fixed_cost_per_trade=0.0,
+        spread_bps=0,
+        impact_coeff=0.10,
+        impact_exponent=0.5,
+        participation_cap=1.0,
+        fixed_cost_per_trade=0.0,
     )
     c1 = compute_execution_cost(0.04, cfg)
     c4 = compute_execution_cost(0.16, cfg)
@@ -43,7 +46,7 @@ def test_vectorised_matches_scalar():
     cfg = ExecutionConfig(spread_bps=5, impact_coeff=0.1)
     sizes = np.array([0.0, 0.01, 0.05, 0.10])
     vec = compute_execution_cost(sizes, cfg)
-    for size, expected in zip(sizes, vec):
+    for size, expected in zip(sizes, vec, strict=True):
         assert compute_execution_cost(float(size), cfg) == pytest.approx(expected)
 
 
@@ -58,6 +61,7 @@ def test_works_on_pandas_series():
 # ---------------------------------------------------------------------------
 # apply_execution_costs
 # ---------------------------------------------------------------------------
+
 
 def _engine_df() -> pd.DataFrame:
     dates = pd.date_range("2020-01-01", periods=20, freq="B")

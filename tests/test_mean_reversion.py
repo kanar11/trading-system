@@ -2,12 +2,11 @@
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from src.strategy.mean_reversion import (
-    mean_reversion_strategy,
     _bollinger_bands,
     _rsi,
+    mean_reversion_strategy,
 )
 
 

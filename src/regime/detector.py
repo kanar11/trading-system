@@ -13,9 +13,9 @@ The detected regime can be used to automatically select the best strategy:
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -198,8 +198,7 @@ def detect_regime(
             and hurst_val >= config.hurst_trending_threshold
         )
         is_mean_reverting = (
-            adx_val <= config.adx_weak_threshold
-            and hurst_val <= config.hurst_mr_threshold
+            adx_val <= config.adx_weak_threshold and hurst_val <= config.hurst_mr_threshold
         )
 
         if is_trending:
@@ -250,9 +249,7 @@ def _smooth_regime(
         counts = np.bincount(x.astype(int), minlength=3)
         return counts.argmax()
 
-    smoothed = encoded.rolling(window, center=False, min_periods=1).apply(
-        _majority, raw=False
-    )
+    smoothed = encoded.rolling(window, center=False, min_periods=1).apply(_majority, raw=False)
     return smoothed.map(reverse)
 
 

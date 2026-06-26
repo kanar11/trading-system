@@ -2,8 +2,8 @@
 
 from src.execution.slippage import (
     ExecutionConfig,
-    compute_execution_cost,
     apply_execution_costs,
+    compute_execution_cost,
 )
 
 __all__ = ["ExecutionConfig", "compute_execution_cost", "apply_execution_costs"]

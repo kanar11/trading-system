@@ -10,10 +10,10 @@ from src.reporting.attribution import (
     factor_regression,
 )
 
-
 # ---------------------------------------------------------------------------
 # compute_beta
 # ---------------------------------------------------------------------------
+
 
 def test_beta_of_series_with_itself_is_one():
     rng = np.random.default_rng(0)
@@ -38,6 +38,7 @@ def test_beta_of_scaled_series():
 # ---------------------------------------------------------------------------
 # factor_regression
 # ---------------------------------------------------------------------------
+
 
 def _synthetic(n: int = 1000, seed: int = 0):
     """Build factors + a strategy with known alpha and known betas."""
@@ -97,9 +98,7 @@ def test_residuals_have_correct_length_and_zero_mean():
 def test_raises_when_too_few_observations():
     dates = pd.date_range("2020-01-01", periods=3, freq="B")
     strat = pd.Series([0.01, 0.02, -0.01], index=dates)
-    factors = pd.DataFrame(
-        {"A": [0.01, 0.0, -0.01], "B": [0.0, 0.01, 0.02]}, index=dates
-    )
+    factors = pd.DataFrame({"A": [0.01, 0.0, -0.01], "B": [0.0, 0.01, 0.02]}, index=dates)
     with pytest.raises(ValueError, match="observations"):
         factor_regression(strat, factors)
 

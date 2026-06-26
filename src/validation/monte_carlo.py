@@ -93,7 +93,7 @@ def bootstrap_returns(
         else:
             n_blocks = int(np.ceil(n / block_size))
             starts = rng.integers(0, max(n - block_size + 1, 1), size=n_blocks)
-            blocks = [values[s:s + block_size] for s in starts]
+            blocks = [values[s : s + block_size] for s in starts]
             sample = np.concatenate(blocks)[:n]
 
         metric_rows.append(calculate_metrics(pd.Series(sample)))

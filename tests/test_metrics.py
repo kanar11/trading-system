@@ -5,10 +5,10 @@ import pytest
 
 from src.reporting.metrics import calculate_metrics, calculate_trade_stats
 
-
 # ---------------------------------------------------------------------------
 # Portfolio-level metrics
 # ---------------------------------------------------------------------------
+
 
 class TestCalculateMetrics:
     def test_positive_returns(self):
@@ -37,8 +37,12 @@ class TestCalculateMetrics:
         metrics = calculate_metrics(pd.Series([0.01, -0.005]))
 
         expected = {
-            "Total Return", "CAGR", "Sharpe Ratio",
-            "Sortino Ratio", "Max Drawdown", "Calmar Ratio",
+            "Total Return",
+            "CAGR",
+            "Sharpe Ratio",
+            "Sortino Ratio",
+            "Max Drawdown",
+            "Calmar Ratio",
         }
         assert set(metrics.keys()) == expected
 
@@ -46,6 +50,7 @@ class TestCalculateMetrics:
 # ---------------------------------------------------------------------------
 # Trade-level analytics
 # ---------------------------------------------------------------------------
+
 
 def _make_trade_log(returns, directions=None, holding_days=None):
     """Helper to build a trade log DataFrame."""

@@ -69,9 +69,7 @@ def compute_beta(
     Returns:
         Beta. Returns 0.0 if the benchmark variance is zero.
     """
-    joined = pd.concat(
-        [strategy_returns, benchmark_returns], axis=1, join="inner"
-    ).dropna()
+    joined = pd.concat([strategy_returns, benchmark_returns], axis=1, join="inner").dropna()
     if len(joined) < 2:
         return 0.0
 
@@ -120,9 +118,7 @@ def factor_regression(
     factor_cols = list(factors.columns)
     k = len(factor_cols)
     if n < k + 2:
-        raise ValueError(
-            f"Need at least {k + 2} observations for {k}-factor regression, got {n}."
-        )
+        raise ValueError(f"Need at least {k + 2} observations for {k}-factor regression, got {n}.")
 
     # design matrix with intercept column
     X = np.column_stack([np.ones(n), df[factor_cols].values])
@@ -134,7 +130,7 @@ def factor_regression(
     residuals = y - y_hat
 
     # statistics
-    rss = float((residuals ** 2).sum())
+    rss = float((residuals**2).sum())
     tss = float(((y - y.mean()) ** 2).sum())
     r_squared = 1 - rss / tss if tss > 0 else 0.0
     p = X.shape[1]  # 1 + k

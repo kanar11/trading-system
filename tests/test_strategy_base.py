@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from src.backtest.event_engine import EventEngine
-from src.strategy.base import Strategy, SmaCrossoverStrategy
+from src.strategy.base import SmaCrossoverStrategy, Strategy
 
 
 def _trending_ohlc(n: int = 200, slope: float = 0.5, seed: int = 0) -> pd.DataFrame:
@@ -79,10 +79,12 @@ class TestSmaCrossover:
 
         class Counter(Strategy):
             calls = 0
-            def on_bar(self, ctx): self.calls += 1
+
+            def on_bar(self, ctx):
+                self.calls += 1
 
         strat = Counter()
         # default on_start / on_end / on_order_event don't blow up
-        strat.on_start.__call__  # exists
+        assert callable(strat.on_start)
         eng.run(df, strat)
         assert strat.calls == 60

@@ -47,6 +47,4 @@ def sample_prices(sample_ohlcv) -> pd.DataFrame:
 @pytest.fixture
 def sample_returns() -> pd.Series:
     """Series of mixed daily returns."""
-    return pd.Series(
-        [0.01, 0.02, -0.005, 0.015, -0.01, 0.008, -0.003, 0.012, 0.005, -0.007]
-    )
+    return pd.Series([0.01, 0.02, -0.005, 0.015, -0.01, 0.008, -0.003, 0.012, 0.005, -0.007])

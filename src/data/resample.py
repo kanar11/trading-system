@@ -36,9 +36,7 @@ def resample_ohlcv(df: pd.DataFrame, rule: str) -> pd.DataFrame:
 
     cols = [c for c in df.columns if c in _OHLCV_AGG]
     if not cols:
-        raise ValueError(
-            "DataFrame must contain at least one of open/high/low/close/volume."
-        )
+        raise ValueError("DataFrame must contain at least one of open/high/low/close/volume.")
 
     agg_spec = {c: _OHLCV_AGG[c] for c in cols}
     out = df[cols].resample(rule).agg(agg_spec).dropna(how="all")

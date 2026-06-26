@@ -5,9 +5,9 @@ import pandas as pd
 import pytest
 
 from src.validation.monte_carlo import (
+    MonteCarloResult,
     bootstrap_returns,
     shuffle_trade_log,
-    MonteCarloResult,
 )
 
 

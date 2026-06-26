@@ -18,7 +18,7 @@ whose columns are individual signal series. They return a single
 from __future__ import annotations
 
 import logging
-from typing import Iterable, Mapping
+from collections.abc import Iterable, Mapping
 
 import numpy as np
 import pandas as pd
@@ -84,18 +84,14 @@ def weighted_sum(
     else:
         w = np.asarray(list(weights), dtype=float)
         if len(w) != len(cols):
-            raise ValueError(
-                f"weights length {len(w)} does not match {len(cols)} signal columns"
-            )
+            raise ValueError(f"weights length {len(w)} does not match {len(cols)} signal columns")
 
     if w.sum() == 0:
         raise ValueError("weights must not sum to zero")
 
     weighted = signals.values * w
     score = weighted.sum(axis=1) / w.sum()
-    combined = np.where(
-        score > threshold, 1, np.where(score < -threshold, -1, 0)
-    ).astype(int)
+    combined = np.where(score > threshold, 1, np.where(score < -threshold, -1, 0)).astype(int)
     return pd.Series(combined, index=signals.index, name="ensemble")
 
 

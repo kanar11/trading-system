@@ -4,12 +4,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.strategy.momentum import momentum_strategy
 from src.backtest.engine import backtest_strategy
+from src.strategy.momentum import momentum_strategy
 from src.validation.walk_forward import (
     WalkForwardConfig,
     run_walk_forward,
-    print_walk_forward_report,
 )
 
 

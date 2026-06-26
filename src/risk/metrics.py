@@ -34,6 +34,7 @@ TRADING_DAYS = 252
 # Value-at-Risk family
 # ---------------------------------------------------------------------------
 
+
 def historical_var(returns: pd.Series, level: float = 0.05) -> float:
     """Historical Value-at-Risk at confidence level (1 - ``level``).
 
@@ -83,6 +84,7 @@ def parametric_var(returns: pd.Series, level: float = 0.05) -> float:
     sigma = float(r.std(ddof=1))
     # inverse normal at the level — use approximation from stat_tests
     from src.validation.stat_tests import _norm_quantile
+
     z = _norm_quantile(level)
     return float(-(mu + z * sigma))
 
@@ -90,6 +92,7 @@ def parametric_var(returns: pd.Series, level: float = 0.05) -> float:
 # ---------------------------------------------------------------------------
 # Tail-shape / drawdown metrics
 # ---------------------------------------------------------------------------
+
 
 def omega_ratio(returns: pd.Series, target_return: float = 0.0) -> float:
     """Omega ratio: gains-above-target / losses-below-target.
@@ -118,7 +121,7 @@ def ulcer_index(returns: pd.Series) -> float:
         return 0.0
     equity = (1 + r).cumprod()
     drawdown_pct = 100 * (equity / equity.cummax() - 1)
-    return float(np.sqrt((drawdown_pct ** 2).mean()))
+    return float(np.sqrt((drawdown_pct**2).mean()))
 
 
 def gain_to_pain_ratio(returns: pd.Series) -> float:
@@ -192,6 +195,7 @@ def drawdown_stats(returns: pd.Series) -> DrawdownStats:
 # Cross-sectional & deviation metrics
 # ---------------------------------------------------------------------------
 
+
 def downside_deviation(returns: pd.Series, target: float = 0.0) -> float:
     """Standard deviation of returns below the target. Annualised."""
     r = pd.Series(returns).dropna()
@@ -261,7 +265,8 @@ def rolling_beta(
     """
     df = pd.concat(
         [strategy_returns.rename("s"), benchmark_returns.rename("b")],
-        axis=1, join="inner",
+        axis=1,
+        join="inner",
     )
     cov = df["s"].rolling(window).cov(df["b"])
     var = df["b"].rolling(window).var()

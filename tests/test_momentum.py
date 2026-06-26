@@ -1,7 +1,6 @@
 """Tests for momentum signal generation."""
 
 import pandas as pd
-import pytest
 
 from src.strategy.momentum import momentum_strategy
 

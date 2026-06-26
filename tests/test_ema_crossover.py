@@ -16,6 +16,7 @@ def _df_from_prices(prices: list[float]) -> pd.DataFrame:
 # EMA crossover
 # ---------------------------------------------------------------------------
 
+
 def test_ema_long_on_rising_series():
     df = _df_from_prices([100 + i for i in range(60)])
     out = ema_crossover_strategy(df, fast=5, slow=20)
@@ -54,6 +55,7 @@ def test_ema_fast_ge_slow_raises():
 # ---------------------------------------------------------------------------
 # MACD
 # ---------------------------------------------------------------------------
+
 
 def test_macd_columns_present():
     df = _df_from_prices([100 + i for i in range(80)])

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from src.indicators.trend import sma, ema
+from src.indicators.trend import ema, sma
 
 
 def _true_range(high: pd.Series, low: pd.Series, close: pd.Series) -> pd.Series:
@@ -48,7 +48,8 @@ def bollinger(
     """Bollinger Bands.
 
     Returns a DataFrame with columns ``middle``, ``upper``, ``lower``,
-    ``bandwidth`` (= (upper - lower) / middle) and ``percent_b`` (= (close - lower) / (upper - lower)).
+    ``bandwidth`` (= (upper - lower) / middle) and ``percent_b``
+    (= (close - lower) / (upper - lower)).
     """
     middle = sma(close, window)
     std = close.rolling(window, min_periods=window).std()
@@ -58,8 +59,11 @@ def bollinger(
     pct_b = (close - lower) / (upper - lower).replace(0, pd.NA)
     return pd.DataFrame(
         {
-            "middle": middle, "upper": upper, "lower": lower,
-            "bandwidth": bandwidth, "percent_b": pct_b,
+            "middle": middle,
+            "upper": upper,
+            "lower": lower,
+            "bandwidth": bandwidth,
+            "percent_b": pct_b,
         }
     )
 
@@ -95,6 +99,4 @@ def donchian(
     """Donchian Channels: rolling N-day high / low. Returns ``upper``, ``lower``, ``middle``."""
     upper = high.rolling(window, min_periods=window).max()
     lower = low.rolling(window, min_periods=window).min()
-    return pd.DataFrame(
-        {"upper": upper, "lower": lower, "middle": (upper + lower) / 2}
-    )
+    return pd.DataFrame({"upper": upper, "lower": lower, "middle": (upper + lower) / 2})

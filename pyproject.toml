@@ -15,11 +15,38 @@ dependencies = [
 dev = [
     "pytest>=7.0",
     "mypy>=1.0",
+    "ruff>=0.6",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "W",   # pycodestyle warnings
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+]
+ignore = [
+    # `(str, Enum)` is a deliberate, behaviour-stable pattern here; switching
+    # to StrEnum changes str()/format() output in the safety-critical OMS.
+    "UP042",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Optional no-op lifecycle hooks on the Strategy ABC are intentional, not
+# missing @abstractmethod declarations.
+"src/strategy/base.py" = ["B027"]
 
 [tool.mypy]
 python_version = "3.11"

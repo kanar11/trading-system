@@ -24,8 +24,8 @@ from __future__ import annotations
 
 import logging
 import sys
-from pathlib import Path
 from functools import partial
+from pathlib import Path
 
 # make `python examples/full_demo.py` work without installing the package
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -37,25 +37,35 @@ matplotlib.use("Agg")  # headless
 import numpy as np
 import pandas as pd
 
-from src.strategy.momentum import momentum_strategy
-from src.strategy.mean_reversion import mean_reversion_strategy
+from src.backtest.engine import backtest_strategy
+from src.execution.slippage import ExecutionConfig, apply_execution_costs
+from src.portfolio import (
+    PortfolioConfig,
+    min_variance_weights,
+    risk_parity_weights,
+    run_portfolio_backtest,
+)
+from src.reporting.attribution import factor_regression, print_attribution_report
+from src.reporting.metrics import calculate_metrics
+from src.reporting.tearsheet import generate_tearsheet
+from src.risk.manager import RiskConfig
+from src.risk.sizing import kelly_fraction
 from src.strategy.breakout import breakout_strategy
 from src.strategy.ema_crossover import ema_crossover_strategy
 from src.strategy.ensemble import majority_vote
-from src.backtest.engine import backtest_strategy
-from src.execution.slippage import ExecutionConfig, apply_execution_costs
-from src.risk.manager import RiskConfig
-from src.risk.sizing import kelly_fraction
-from src.validation.walk_forward import WalkForwardConfig, run_walk_forward, print_walk_forward_report
+from src.strategy.mean_reversion import mean_reversion_strategy
+from src.strategy.momentum import momentum_strategy
 from src.validation.monte_carlo import bootstrap_returns, print_monte_carlo_report
-from src.validation.stat_tests import sharpe_ttest, probabilistic_sharpe_ratio, deflated_sharpe_ratio
-from src.portfolio import (
-    PortfolioConfig, run_portfolio_backtest,
-    min_variance_weights, risk_parity_weights,
+from src.validation.stat_tests import (
+    deflated_sharpe_ratio,
+    probabilistic_sharpe_ratio,
+    sharpe_ttest,
 )
-from src.reporting.metrics import calculate_metrics
-from src.reporting.tearsheet import generate_tearsheet
-from src.reporting.attribution import factor_regression, print_attribution_report
+from src.validation.walk_forward import (
+    WalkForwardConfig,
+    print_walk_forward_report,
+    run_walk_forward,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -114,16 +124,17 @@ def main() -> None:
     bo = breakout_strategy(main_df, entry_window=20, exit_window=10)["signal"]
     em = ema_crossover_strategy(main_df, fast=20, slow=50)["signal"]
 
-    counts = pd.DataFrame(
-        {"momentum": mom, "mean_rev": mr, "breakout": bo, "ema_cross": em}
-    ).apply(lambda s: s.value_counts()).fillna(0).astype(int)
+    counts = (
+        pd.DataFrame({"momentum": mom, "mean_rev": mr, "breakout": bo, "ema_cross": em})
+        .apply(lambda s: s.value_counts())
+        .fillna(0)
+        .astype(int)
+    )
     print(counts.to_string())
 
     # --- 3. ensemble -----------------------------------------------------
     section("3. Ensemble -- majority vote across 4 strategies")
-    signals_df = pd.DataFrame(
-        {"mom": mom, "mr": mr, "bo": bo, "em": em}
-    ).fillna(0).astype(int)
+    signals_df = pd.DataFrame({"mom": mom, "mr": mr, "bo": bo, "em": em}).fillna(0).astype(int)
     ensemble_sig = majority_vote(signals_df)
     ensemble_df = main_df.copy()
     ensemble_df["signal"] = ensemble_sig
@@ -133,8 +144,10 @@ def main() -> None:
     section("4. Backtest -- risk controls + realistic execution")
     risk = RiskConfig(stop_loss=0.05, take_profit=0.10, trailing_stop=0.03)
     bt, trades = backtest_strategy(
-        ensemble_df, transaction_cost=0.0,
-        vol_target=None, risk_config=risk,
+        ensemble_df,
+        transaction_cost=0.0,
+        vol_target=None,
+        risk_config=risk,
     )
     # impact_coeff and participation_cap tuned for this demo so a full
     # long->short reversal (|delta|=2) does not eat the equity curve
@@ -172,7 +185,10 @@ def main() -> None:
     sr_test = sharpe_ttest(bt["strategy_returns"])
     psr = probabilistic_sharpe_ratio(bt["strategy_returns"])
     dsr = deflated_sharpe_ratio(bt["strategy_returns"], n_trials=50)
-    print(f"  Annualised SR     : {sr_test.sharpe_annualised:>+7.2f}  (t={sr_test.t_stat:+.2f}, p={sr_test.p_value_two_sided:.3f})")
+    print(
+        f"  Annualised SR     : {sr_test.sharpe_annualised:>+7.2f}  "
+        f"(t={sr_test.t_stat:+.2f}, p={sr_test.p_value_two_sided:.3f})"
+    )
     print(f"  PSR(SR > 0)       : {psr:.3f}")
     print(f"  Deflated SR (50 trials): {dsr:.3f}")
 
@@ -181,8 +197,12 @@ def main() -> None:
     strategy_fn = partial(momentum_strategy, lookback=60, threshold=0.0, use_sma_filter=False)
     backtest_fn = partial(backtest_strategy, transaction_cost=0.001, vol_target=None)
 
-    equal_res = run_portfolio_backtest(basket, strategy_fn, backtest_fn, PortfolioConfig(weighting="equal"))
-    invvol_res = run_portfolio_backtest(basket, strategy_fn, backtest_fn, PortfolioConfig(weighting="inverse_vol"))
+    equal_res = run_portfolio_backtest(
+        basket, strategy_fn, backtest_fn, PortfolioConfig(weighting="equal")
+    )
+    invvol_res = run_portfolio_backtest(
+        basket, strategy_fn, backtest_fn, PortfolioConfig(weighting="inverse_vol")
+    )
 
     # plug closed-form optimisers using the per-asset return panel
     minvar_w = min_variance_weights(equal_res.returns)
@@ -201,7 +221,7 @@ def main() -> None:
     # --- 7. reporting ----------------------------------------------------
     section("7a. Tearsheet PNG")
     tearsheet_path = out_dir / "tearsheet.png"
-    fig = generate_tearsheet(
+    generate_tearsheet(
         bt["strategy_returns"],
         benchmark=bt["market_returns"],
         trade_log=trades,
@@ -213,7 +233,8 @@ def main() -> None:
     section("7b. Factor attribution vs the basket")
     # use the per-asset returns as "factors" for attribution
     attribution = factor_regression(
-        bt["strategy_returns"], factors=equal_res.returns,
+        bt["strategy_returns"],
+        factors=equal_res.returns,
     )
     print_attribution_report(attribution, title="Ensemble vs basket factors")
 

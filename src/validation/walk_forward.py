@@ -10,8 +10,8 @@ Typical usage:
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -33,9 +33,9 @@ class WalkForwardConfig:
         min_trades: Minimum trades required in OOS window for a valid fold.
     """
 
-    in_sample_days: int = 504    # ~2 years
+    in_sample_days: int = 504  # ~2 years
     out_of_sample_days: int = 126  # ~6 months
-    step_days: int | None = None   # defaults to out_of_sample_days
+    step_days: int | None = None  # defaults to out_of_sample_days
     min_trades: int = 5
 
     def __post_init__(self) -> None:
@@ -156,9 +156,7 @@ def run_walk_forward(
         # count OOS trades
         oos_trade_count = 0
         if not full_trades.empty and "entry_date" in full_trades.columns:
-            oos_trade_count = int(
-                (full_trades["entry_date"] >= df.index[oos_start]).sum()
-            )
+            oos_trade_count = int((full_trades["entry_date"] >= df.index[oos_start]).sum())
 
         fold_result = FoldResult(
             fold=fold_num,
@@ -198,9 +196,7 @@ def run_walk_forward(
     avg_is_sharpe = float(np.mean([f.is_metrics["Sharpe Ratio"] for f in folds]))
     avg_oos_sharpe = summary_metrics["Avg OOS Sharpe"]
     degradation = (
-        (avg_is_sharpe - avg_oos_sharpe) / abs(avg_is_sharpe)
-        if avg_is_sharpe != 0
-        else 0.0
+        (avg_is_sharpe - avg_oos_sharpe) / abs(avg_is_sharpe) if avg_is_sharpe != 0 else 0.0
     )
 
     return {
@@ -226,7 +222,10 @@ def print_walk_forward_report(results: dict) -> None:
     print("=" * 60)
 
     # per-fold summary
-    print(f"\n{'Fold':>4}  {'OOS Period':<25}  {'Sharpe':>8}  {'Return':>8}  {'MaxDD':>8}  {'Trades':>6}")
+    print(
+        f"\n{'Fold':>4}  {'OOS Period':<25}  {'Sharpe':>8}  "
+        f"{'Return':>8}  {'MaxDD':>8}  {'Trades':>6}"
+    )
     print("-" * 70)
     for f in results["folds"]:
         period = f"{f.oos_start} -> {f.oos_end}"

@@ -21,9 +21,9 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
 from src.reporting.metrics import calculate_metrics, calculate_trade_stats
@@ -120,12 +120,17 @@ def generate_tearsheet(
         vmax = float(np.nanmax(np.abs(mat.values))) if mat.size > 0 else 0.0
         vmax = vmax if vmax > 0 else 1.0
         im = ax_hm.imshow(
-            mat.values, aspect="auto", cmap="RdYlGn", vmin=-vmax, vmax=vmax,
+            mat.values,
+            aspect="auto",
+            cmap="RdYlGn",
+            vmin=-vmax,
+            vmax=vmax,
         )
         ax_hm.set_xticks(range(mat.shape[1]))
         ax_hm.set_xticklabels(
-            ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-             "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][:mat.shape[1]]
+            ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][
+                : mat.shape[1]
+            ]
         )
         ax_hm.set_yticks(range(mat.shape[0]))
         ax_hm.set_yticklabels(mat.index)
@@ -134,8 +139,12 @@ def generate_tearsheet(
                 v = mat.values[i, j]
                 if not np.isnan(v):
                     ax_hm.text(
-                        j, i, f"{v:.1%}",
-                        ha="center", va="center", fontsize=7,
+                        j,
+                        i,
+                        f"{v:.1%}",
+                        ha="center",
+                        va="center",
+                        fontsize=7,
                         color="black" if abs(v) < vmax * 0.5 else "white",
                     )
         fig.colorbar(im, ax=ax_hm, shrink=0.7, format="%.0%%")
@@ -165,14 +174,19 @@ def generate_tearsheet(
         ("Calmar", f"{metrics['Calmar Ratio']:.2f}"),
     ]
     if trade_stats and trade_stats["Total Trades"] > 0:
-        rows.extend([
-            ("Trades", f"{trade_stats['Total Trades']}"),
-            ("Win Rate", f"{trade_stats['Win Rate']:.1%}"),
-            ("Profit Factor", f"{trade_stats['Profit Factor']:.2f}"),
-        ])
+        rows.extend(
+            [
+                ("Trades", f"{trade_stats['Total Trades']}"),
+                ("Win Rate", f"{trade_stats['Win Rate']:.1%}"),
+                ("Profit Factor", f"{trade_stats['Profit Factor']:.2f}"),
+            ]
+        )
     table = ax_tbl.table(
-        cellText=rows, colLabels=["Metric", "Value"],
-        loc="center", cellLoc="left", colWidths=[0.5, 0.5],
+        cellText=rows,
+        colLabels=["Metric", "Value"],
+        loc="center",
+        cellLoc="left",
+        colWidths=[0.5, 0.5],
     )
     table.auto_set_font_size(False)
     table.set_fontsize(10)

@@ -18,8 +18,8 @@ survives diversification across a basket.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Callable, Mapping
 
 import numpy as np
 import pandas as pd
@@ -100,9 +100,7 @@ def _compute_weights(
     elif config.weighting == "custom":
         if not config.custom_weights:
             raise ValueError("custom_weights required when weighting='custom'")
-        raw = np.array(
-            [config.custom_weights.get(t, 0.0) for t in tickers], dtype=float
-        )
+        raw = np.array([config.custom_weights.get(t, 0.0) for t in tickers], dtype=float)
         total = raw.sum()
         if total <= 0:
             raise ValueError("custom_weights must sum to a positive value")
