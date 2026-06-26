@@ -5,13 +5,14 @@ and optional risk management controls. Produces an equity curve and trade log.
 """
 
 import logging
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
-logger = logging.getLogger(__name__)
-
 from src.risk.manager import RiskConfig, apply_risk_controls
+
+logger = logging.getLogger(__name__)
 
 
 def backtest_strategy(
@@ -53,9 +54,7 @@ def backtest_strategy(
 
     # volatility targeting
     if vol_target is not None:
-        df["realized_vol"] = (
-            df["market_returns"].rolling(vol_window).std() * np.sqrt(252)
-        )
+        df["realized_vol"] = df["market_returns"].rolling(vol_window).std() * np.sqrt(252)
         df["vol_scalar"] = (vol_target / df["realized_vol"]).clip(upper=3.0).fillna(0)
         df["scaled_position"] = df["position"] * df["vol_scalar"]
     else:
@@ -88,72 +87,65 @@ def _build_trade_log(df: pd.DataFrame) -> pd.DataFrame:
     """Extract a trade-level log from the backtest DataFrame.
 
     Each row represents a single round-trip trade with entry/exit dates,
-    prices, direction, return, and holding period.
+    prices, direction, return, and holding period. An open position at the
+    end of the series is marked to market on the final bar.
     """
-    trades: list[dict] = []
-    current_position: float = 0.0
-    entry_date = None
-    entry_price: float | None = None
+    positions = df["position"].to_numpy()
+    prices = df["close"].to_numpy()
+    index = pd.DatetimeIndex(df.index)
+    n = len(df)
 
-    for date, row in df.iterrows():
-        new_position = row["position"]
-        price = row["close"]
+    trades: list[dict[str, Any]] = []
+    current_position = 0.0
+    entry_idx: int | None = None
+
+    for i in range(n):
+        new_position = float(positions[i])
 
         # new entry from flat
         if current_position == 0 and new_position != 0:
             current_position = new_position
-            entry_date = date
-            entry_price = price
+            entry_idx = i
 
-        # position change or exit
+        # position change or exit (including a direct flip)
         elif current_position != 0 and new_position != current_position:
-            if entry_price is not None:
-                trade_return = (
-                    (price / entry_price) - 1
-                    if current_position == 1
-                    else (entry_price / price) - 1
-                )
-                trades.append(
-                    {
-                        "entry_date": entry_date,
-                        "exit_date": date,
-                        "direction": int(current_position),
-                        "entry_price": entry_price,
-                        "exit_price": price,
-                        "trade_return": trade_return,
-                        "holding_days": (date - entry_date).days,
-                    }
-                )
-
-            # flip to new position
+            if entry_idx is not None:
+                trades.append(_make_trade(index, prices, entry_idx, i, current_position))
             if new_position != 0:
                 current_position = new_position
-                entry_date = date
-                entry_price = price
+                entry_idx = i
             else:
-                current_position = 0
-                entry_date = None
-                entry_price = None
+                current_position = 0.0
+                entry_idx = None
 
     # mark-to-market open position at end
-    if current_position != 0 and entry_price is not None:
-        last_date = df.index[-1]
-        last_price = df["close"].iloc[-1]
-        trade_return = (
-            (last_price / entry_price) - 1
-            if current_position == 1
-            else (entry_price / last_price) - 1
-        )
-        trades.append(
-            {
-                "entry_date": entry_date,
-                "exit_date": last_date,
-                "direction": int(current_position),
-                "entry_price": entry_price,
-                "exit_price": last_price,
-                "trade_return": trade_return,
-                "holding_days": (last_date - entry_date).days,
-            }
-        )
+    if current_position != 0 and entry_idx is not None:
+        trades.append(_make_trade(index, prices, entry_idx, n - 1, current_position))
 
     return pd.DataFrame(trades)
+
+
+def _make_trade(
+    index: pd.DatetimeIndex,
+    prices: np.ndarray,
+    entry_idx: int,
+    exit_idx: int,
+    direction: float,
+) -> dict[str, Any]:
+    """Assemble a single round-trip trade record from positional indices."""
+    entry_price = float(prices[entry_idx])
+    exit_price = float(prices[exit_idx])
+    if direction > 0:
+        trade_return = exit_price / entry_price - 1.0
+    else:
+        trade_return = entry_price / exit_price - 1.0
+
+    return {
+        "entry_date": index[entry_idx],
+        "exit_date": index[exit_idx],
+        "direction": int(direction),
+        "entry_price": entry_price,
+        "exit_price": exit_price,
+        "trade_return": trade_return,
+        "holding_days": (index[exit_idx] - index[entry_idx]).days,
+    }

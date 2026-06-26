@@ -7,16 +7,25 @@ trade-level analytics (from a trade log DataFrame).
 import numpy as np
 import pandas as pd
 
-
 # ---------------------------------------------------------------------------
 # Portfolio-level metrics
 # ---------------------------------------------------------------------------
 
-def calculate_metrics(strategy_returns: pd.Series) -> dict[str, float]:
-    """Compute core performance statistics from a daily return series.
+
+def calculate_metrics(
+    strategy_returns: pd.Series,
+    risk_free_rate: float = 0.0,
+    periods_per_year: int = 252,
+) -> dict[str, float]:
+    """Compute core performance statistics from a periodic return series.
+
+    Sharpe and Sortino are computed on excess returns over the risk-free
+    rate and annualised by ``periods_per_year``.
 
     Args:
-        strategy_returns: Daily returns (not cumulative).
+        strategy_returns: Periodic returns (not cumulative), typically daily.
+        risk_free_rate: Annualised risk-free rate used for excess returns.
+        periods_per_year: Number of return periods per year (252 for daily).
 
     Returns:
         Dictionary with Total Return, CAGR, Sharpe Ratio, Sortino Ratio,
@@ -35,34 +44,36 @@ def calculate_metrics(strategy_returns: pd.Series) -> dict[str, float]:
         }
 
     equity_curve = (1 + strategy_returns).cumprod()
-    total_return = equity_curve.iloc[-1] - 1
+    final_equity = float(equity_curve.iloc[-1])
+    total_return = final_equity - 1.0
 
     n_days = len(strategy_returns)
-    years = n_days / 252 if n_days > 0 else 0
-    cagr = (equity_curve.iloc[-1] ** (1 / years) - 1) if years > 0 else 0.0
+    years = n_days / periods_per_year
+    if years > 0 and final_equity > 0:
+        cagr = final_equity ** (1 / years) - 1.0
+    elif final_equity <= 0:
+        cagr = -1.0  # capital fully wiped out
+    else:
+        cagr = 0.0
 
-    volatility = strategy_returns.std()
-    sharpe = (
-        (strategy_returns.mean() / volatility) * np.sqrt(252)
-        if volatility > 0
-        else 0.0
-    )
+    # per-period risk-free rate for excess-return calculations
+    rf_period = risk_free_rate / periods_per_year
+    excess = strategy_returns - rf_period
+    ann = np.sqrt(periods_per_year)
 
-    # Sortino — downside deviation only
-    downside = strategy_returns[strategy_returns < 0]
-    downside_std = downside.std() if len(downside) > 1 else 0.0
-    if pd.isna(downside_std):
-        downside_std = 0.0
-    sortino = (
-        (strategy_returns.mean() / downside_std) * np.sqrt(252)
-        if downside_std > 0
-        else 0.0
-    )
+    mean_excess = float(excess.mean())
+    volatility = float(strategy_returns.std())
+    sharpe = float(mean_excess / volatility * ann) if volatility > 0 else 0.0
+
+    # Sortino — annualised downside deviation of excess returns below zero
+    downside = excess.clip(upper=0.0)
+    downside_dev = float(np.sqrt((downside**2).mean()))
+    sortino = float(mean_excess / downside_dev * ann) if downside_dev > 0 else 0.0
 
     # drawdown
     rolling_max = equity_curve.cummax()
-    drawdown = equity_curve / rolling_max - 1
-    max_drawdown = drawdown.min()
+    drawdown = equity_curve / rolling_max - 1.0
+    max_drawdown = float(drawdown.min())
 
     # Calmar = CAGR / |Max Drawdown|
     calmar = abs(cagr / max_drawdown) if max_drawdown != 0 else 0.0
@@ -80,6 +91,7 @@ def calculate_metrics(strategy_returns: pd.Series) -> dict[str, float]:
 # ---------------------------------------------------------------------------
 # Trade-level analytics
 # ---------------------------------------------------------------------------
+
 
 def calculate_trade_stats(trade_log: pd.DataFrame) -> dict[str, float | int]:
     """Compute trade-level statistics from a trade log.
@@ -137,13 +149,9 @@ def calculate_trade_stats(trade_log: pd.DataFrame) -> dict[str, float | int]:
     if "holding_days" in trade_log.columns:
         avg_holding = float(trade_log["holding_days"].mean())
         if n_win > 0:
-            avg_holding_win = float(
-                trade_log.loc[returns > 0, "holding_days"].mean()
-            )
+            avg_holding_win = float(trade_log.loc[returns > 0, "holding_days"].mean())
         if n_loss > 0:
-            avg_holding_loss = float(
-                trade_log.loc[returns < 0, "holding_days"].mean()
-            )
+            avg_holding_loss = float(trade_log.loc[returns < 0, "holding_days"].mean())
 
     # direction breakdown
     n_long = 0

@@ -35,7 +35,15 @@ def momentum_strategy(
 
     Returns:
         DataFrame with an added 'signal' column.
+
+    Raises:
+        ValueError: If the 'close' column is missing or ``lookback`` < 1.
     """
+    if "close" not in df.columns:
+        raise ValueError("DataFrame must contain a 'close' column.")
+    if lookback < 1:
+        raise ValueError(f"lookback must be >= 1, got {lookback}.")
+
     df = df.copy()
 
     df["returns"] = df["close"].pct_change(lookback)

@@ -40,6 +40,11 @@ def plot_heatmap(csv_path: str = "results/sweep_results.csv") -> None:
     if sharpe_col not in df.columns and "Sharpe Ratio" in df.columns:
         sharpe_col = "Sharpe Ratio"
 
+    required = {"lookback", "threshold", sharpe_col}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"CSV '{path}' is missing required columns: {sorted(missing)}")
+
     pivot = df.pivot_table(
         index="lookback",
         columns="threshold",
@@ -55,6 +60,7 @@ def plot_heatmap(csv_path: str = "results/sweep_results.csv") -> None:
     fig.tight_layout()
 
     output_path = Path("results") / "parameter_heatmap.png"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=150)
     plt.close(fig)
     print(f"Saved: {output_path}")

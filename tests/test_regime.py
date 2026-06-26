@@ -1,20 +1,20 @@
 """Tests for the regime detection module."""
 
+from functools import partial
+
 import numpy as np
 import pandas as pd
-import pytest
 
 from src.regime.detector import (
     RegimeConfig,
     RegimeType,
-    detect_regime,
-    adaptive_strategy,
     _adx,
     _rolling_hurst,
+    adaptive_strategy,
+    detect_regime,
 )
-from src.strategy.momentum import momentum_strategy
 from src.strategy.mean_reversion import mean_reversion_strategy
-from functools import partial
+from src.strategy.momentum import momentum_strategy
 
 
 def _make_ohlc_df(n: int = 300, trend: bool = True) -> pd.DataFrame:
@@ -47,13 +47,13 @@ def _make_close_only_df(n: int = 300) -> pd.DataFrame:
 
 
 class TestADX:
-    def test_returns_series(self):
+    def test_returns_series(self) -> None:
         df = _make_ohlc_df(200)
         adx = _adx(df["high"], df["low"], df["close"], period=14)
         assert isinstance(adx, pd.Series)
         assert len(adx) == 200
 
-    def test_adx_non_negative(self):
+    def test_adx_non_negative(self) -> None:
         df = _make_ohlc_df(200)
         adx = _adx(df["high"], df["low"], df["close"], period=14)
         valid = adx.dropna()
@@ -61,13 +61,13 @@ class TestADX:
 
 
 class TestHurst:
-    def test_returns_series(self):
+    def test_returns_series(self) -> None:
         df = _make_close_only_df(200)
         h = _rolling_hurst(df["close"], window=50)
         assert isinstance(h, pd.Series)
         assert len(h) == 200
 
-    def test_hurst_in_valid_range(self):
+    def test_hurst_in_valid_range(self) -> None:
         df = _make_close_only_df(300)
         h = _rolling_hurst(df["close"], window=50)
         valid = h.dropna()
@@ -77,7 +77,7 @@ class TestHurst:
 
 
 class TestDetectRegime:
-    def test_adds_regime_column(self):
+    def test_adds_regime_column(self) -> None:
         df = _make_ohlc_df(300)
         result = detect_regime(df)
         assert "regime" in result.columns
@@ -85,19 +85,19 @@ class TestDetectRegime:
         assert "hurst" in result.columns
         assert "vol_regime" in result.columns
 
-    def test_regime_values_are_valid(self):
+    def test_regime_values_are_valid(self) -> None:
         df = _make_ohlc_df(300)
         result = detect_regime(df)
         valid_types = {RegimeType.TRENDING, RegimeType.MEAN_REVERTING, RegimeType.UNDEFINED}
         assert set(result["regime"].unique()).issubset(valid_types)
 
-    def test_works_without_high_low(self):
+    def test_works_without_high_low(self) -> None:
         df = _make_close_only_df(300)
         result = detect_regime(df)
         assert "regime" in result.columns
         assert "adx" in result.columns
 
-    def test_custom_config(self):
+    def test_custom_config(self) -> None:
         df = _make_ohlc_df(300)
         config = RegimeConfig(
             adx_period=10,
@@ -108,7 +108,7 @@ class TestDetectRegime:
         result = detect_regime(df, config=config)
         assert "regime" in result.columns
 
-    def test_smoothing_reduces_changes(self):
+    def test_smoothing_reduces_changes(self) -> None:
         df = _make_ohlc_df(300)
         no_smooth = detect_regime(df, RegimeConfig(smoothing_window=1))
         smoothed = detect_regime(df, RegimeConfig(smoothing_window=10))
@@ -121,7 +121,7 @@ class TestDetectRegime:
 
 
 class TestAdaptiveStrategy:
-    def test_returns_signal_column(self):
+    def test_returns_signal_column(self) -> None:
         df = _make_ohlc_df(300)
         mom_fn = partial(momentum_strategy, lookback=20, threshold=0.01)
         mr_fn = partial(mean_reversion_strategy, bb_window=20)
@@ -130,7 +130,7 @@ class TestAdaptiveStrategy:
         assert "signal" in result.columns
         assert "regime" in result.columns
 
-    def test_signals_are_valid(self):
+    def test_signals_are_valid(self) -> None:
         df = _make_ohlc_df(300)
         mom_fn = partial(momentum_strategy, lookback=20, threshold=0.01)
         mr_fn = partial(mean_reversion_strategy, bb_window=20)
@@ -138,7 +138,7 @@ class TestAdaptiveStrategy:
         result = adaptive_strategy(df, mom_fn, mr_fn)
         assert set(result["signal"].unique()).issubset({-1, 0, 1})
 
-    def test_flat_during_undefined(self):
+    def test_flat_during_undefined(self) -> None:
         df = _make_ohlc_df(300)
         mom_fn = partial(momentum_strategy, lookback=20, threshold=0.01)
         mr_fn = partial(mean_reversion_strategy, bb_window=20)

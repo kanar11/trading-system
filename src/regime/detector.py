@@ -13,9 +13,9 @@ The detected regime can be used to automatically select the best strategy:
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from enum import Enum
-from typing import Callable
+from enum import StrEnum
 
 import numpy as np
 import pandas as pd
@@ -23,7 +23,7 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-class RegimeType(str, Enum):
+class RegimeType(StrEnum):
     """Market regime classification."""
 
     TRENDING = "trending"
@@ -90,14 +90,15 @@ def _adx(
     tr3 = (low - close.shift(1)).abs()
     true_range = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
 
-    atr = true_range.ewm(alpha=1 / period, min_periods=period).mean()
-    plus_di = 100 * (plus_dm.ewm(alpha=1 / period, min_periods=period).mean() / atr)
-    minus_di = 100 * (minus_dm.ewm(alpha=1 / period, min_periods=period).mean() / atr)
+    # Wilder's smoothing (RMA): alpha = 1/period with adjust=False
+    atr = true_range.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
+    plus_di = 100 * (plus_dm.ewm(alpha=1 / period, min_periods=period, adjust=False).mean() / atr)
+    minus_di = 100 * (minus_dm.ewm(alpha=1 / period, min_periods=period, adjust=False).mean() / atr)
 
     dx = 100 * (plus_di - minus_di).abs() / (plus_di + minus_di).replace(0, np.nan)
-    adx = dx.ewm(alpha=1 / period, min_periods=period).mean()
+    adx = dx.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
 
-    return adx
+    return pd.Series(adx)
 
 
 def _rolling_hurst(series: pd.Series, window: int = 100) -> pd.Series:
@@ -117,12 +118,13 @@ def _rolling_hurst(series: pd.Series, window: int = 100) -> pd.Series:
     Returns:
         Rolling Hurst exponent estimate.
     """
-    log_returns = np.log(series / series.shift(1))
+    ratio = series / series.shift(1)
+    log_returns = pd.Series(np.log(ratio.to_numpy()), index=series.index)
 
-    def _hurst_rs(x):
+    def _hurst_rs(x: pd.Series) -> float:
         x = x.dropna()
         if len(x) < 20:
-            return np.nan
+            return float("nan")
 
         mean_r = x.mean()
         deviations = (x - mean_r).cumsum()
@@ -130,12 +132,12 @@ def _rolling_hurst(series: pd.Series, window: int = 100) -> pd.Series:
         s = x.std()
 
         if s == 0 or r == 0:
-            return np.nan
+            return float("nan")
 
-        return np.log(r / s) / np.log(len(x))
+        return float(np.log(r / s) / np.log(len(x)))
 
     hurst = log_returns.rolling(window).apply(_hurst_rs, raw=False)
-    return hurst
+    return pd.Series(hurst)
 
 
 def detect_regime(
@@ -183,7 +185,7 @@ def detect_regime(
     df["vol_regime"] = np.where(daily_vol > vol_threshold, "high", "low")
 
     # --- Classify regime ---
-    regimes = []
+    regimes: list[RegimeType] = []
     for i in range(len(df)):
         adx_val = df["adx"].iloc[i]
         hurst_val = df["hurst"].iloc[i]
@@ -198,8 +200,7 @@ def detect_regime(
             and hurst_val >= config.hurst_trending_threshold
         )
         is_mean_reverting = (
-            adx_val <= config.adx_weak_threshold
-            and hurst_val <= config.hurst_mr_threshold
+            adx_val <= config.adx_weak_threshold and hurst_val <= config.hurst_mr_threshold
         )
 
         if is_trending:
@@ -243,17 +244,15 @@ def _smooth_regime(
 
     encoded = regime_series.map(mapping).astype(float)
 
-    def _majority(x):
-        x = x.dropna()
-        if len(x) == 0:
+    def _majority(x: pd.Series) -> int:
+        values = x.dropna()
+        if len(values) == 0:
             return 1  # undefined
-        counts = np.bincount(x.astype(int), minlength=3)
-        return counts.argmax()
+        counts = np.bincount(values.astype(int), minlength=3)
+        return int(counts.argmax())
 
-    smoothed = encoded.rolling(window, center=False, min_periods=1).apply(
-        _majority, raw=False
-    )
-    return smoothed.map(reverse)
+    smoothed = encoded.rolling(window, center=False, min_periods=1).apply(_majority, raw=False)
+    return pd.Series(smoothed.map(reverse))
 
 
 def adaptive_strategy(

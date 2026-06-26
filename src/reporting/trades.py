@@ -8,6 +8,7 @@ For normal backtests you do NOT need to call this module directly.
 """
 
 import logging
+from typing import Any
 
 import pandas as pd
 
@@ -22,17 +23,24 @@ def build_trade_log(result: pd.DataFrame) -> pd.DataFrame:
     The main backtest pipeline builds its own trade log internally.
 
     Args:
-        result: DataFrame with 'close' and 'pos' columns.
+        result: DataFrame with 'close' and 'pos' columns, indexed by date.
 
     Returns:
         DataFrame with one row per round-trip trade containing entry/exit
-        dates, prices, direction, return, and holding period.
+        dates, prices, direction, return, and holding period. Empty if the
+        input has no position changes.
+
+    Raises:
+        ValueError: If the 'pos' or 'close' column is missing.
     """
     df = result.copy()
 
-    if "pos" not in df.columns:
-        raise ValueError("DataFrame must contain a 'pos' column. "
-                         "For backtest results use the trade log from backtest_strategy().")
+    for col in ("pos", "close"):
+        if col not in df.columns:
+            raise ValueError(
+                f"DataFrame must contain a '{col}' column. For backtest "
+                "results use the trade log from backtest_strategy()."
+            )
 
     pos = df["pos"].astype(int)
     prev_pos = pos.shift(1).fillna(0).astype(int)
@@ -40,9 +48,9 @@ def build_trade_log(result: pd.DataFrame) -> pd.DataFrame:
     change = pos - prev_pos
     change_dates = df.index[change != 0]
 
-    trades: list[dict] = []
+    trades: list[dict[str, Any]] = []
     current_pos: int = 0
-    entry_date = None
+    entry_date: pd.Timestamp | None = None
     entry_price: float | None = None
 
     for dt in change_dates:
@@ -51,15 +59,7 @@ def build_trade_log(result: pd.DataFrame) -> pd.DataFrame:
 
         # close existing trade
         if current_pos != 0 and entry_price is not None:
-            trade_return = current_pos * (price / entry_price - 1.0)
-            trades.append({
-                "entry_date": entry_date,
-                "exit_date": dt,
-                "direction": current_pos,
-                "entry_price": entry_price,
-                "exit_price": price,
-                "trade_return": trade_return,
-            })
+            trades.append(_make_trade(current_pos, entry_date, dt, entry_price, price))
             entry_date = None
             entry_price = None
 
@@ -75,21 +75,29 @@ def build_trade_log(result: pd.DataFrame) -> pd.DataFrame:
     if current_pos != 0 and entry_price is not None:
         last_date = df.index[-1]
         last_price = float(df["close"].iloc[-1])
-        trade_return = current_pos * (last_price / entry_price - 1.0)
-        trades.append({
-            "entry_date": entry_date,
-            "exit_date": last_date,
-            "direction": current_pos,
-            "entry_price": entry_price,
-            "exit_price": last_price,
-            "trade_return": trade_return,
-        })
+        trades.append(_make_trade(current_pos, entry_date, last_date, entry_price, last_price))
 
     trade_df = pd.DataFrame(trades)
 
     if not trade_df.empty:
-        trade_df["holding_days"] = (
-            trade_df["exit_date"] - trade_df["entry_date"]
-        ).dt.days
+        trade_df["holding_days"] = (trade_df["exit_date"] - trade_df["entry_date"]).dt.days
 
     return trade_df
+
+
+def _make_trade(
+    direction: int,
+    entry_date: pd.Timestamp | None,
+    exit_date: pd.Timestamp,
+    entry_price: float,
+    exit_price: float,
+) -> dict[str, Any]:
+    """Assemble a single round-trip trade record."""
+    return {
+        "entry_date": entry_date,
+        "exit_date": exit_date,
+        "direction": direction,
+        "entry_price": entry_price,
+        "exit_price": exit_price,
+        "trade_return": direction * (exit_price / entry_price - 1.0),
+    }

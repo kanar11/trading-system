@@ -13,22 +13,24 @@ Usage:
 
 import argparse
 import logging
-from pathlib import Path
+from collections.abc import Callable
 from functools import partial
+from pathlib import Path
 
 import matplotlib.pyplot as plt
+import pandas as pd
 
-from src.data.loader import load_yahoo_ohlcv
-from src.strategy.momentum import momentum_strategy
-from src.strategy.mean_reversion import mean_reversion_strategy
 from src.backtest.engine import backtest_strategy
+from src.data.loader import load_yahoo_ohlcv
+from src.regime.detector import RegimeConfig, adaptive_strategy
 from src.reporting.metrics import calculate_metrics, calculate_trade_stats
 from src.risk.manager import RiskConfig, summarise_risk_events
-from src.regime.detector import adaptive_strategy, RegimeConfig
+from src.strategy.mean_reversion import mean_reversion_strategy
+from src.strategy.momentum import momentum_strategy
 from src.validation.walk_forward import (
     WalkForwardConfig,
-    run_walk_forward,
     print_walk_forward_report,
+    run_walk_forward,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,55 +44,105 @@ def parse_args() -> argparse.Namespace:
 
     # data
     parser.add_argument("--ticker", default="SPY", help="Yahoo Finance symbol (default: SPY)")
-    parser.add_argument("--start", default="2010-01-01", help="Start date YYYY-MM-DD (default: 2010-01-01)")
+    parser.add_argument(
+        "--start", default="2010-01-01", help="Start date YYYY-MM-DD (default: 2010-01-01)"
+    )
 
     # strategy selection
     parser.add_argument(
-        "--strategy", choices=["momentum", "mean-reversion", "adaptive"],
+        "--strategy",
+        choices=["momentum", "mean-reversion", "adaptive"],
         default="momentum",
         help="Strategy type: momentum, mean-reversion, or adaptive (default: momentum)",
     )
 
     # momentum params
-    parser.add_argument("--lookback", type=int, default=200, help="Momentum lookback period (default: 200)")
-    parser.add_argument("--threshold", type=float, default=0.005, help="Signal threshold (default: 0.005)")
-    parser.add_argument("--no-sma-filter", action="store_true", help="Disable SMA-200 regime filter")
+    parser.add_argument(
+        "--lookback", type=int, default=200, help="Momentum lookback period (default: 200)"
+    )
+    parser.add_argument(
+        "--threshold", type=float, default=0.005, help="Signal threshold (default: 0.005)"
+    )
+    parser.add_argument(
+        "--no-sma-filter", action="store_true", help="Disable SMA-200 regime filter"
+    )
 
     # mean reversion params
-    parser.add_argument("--bb-window", type=int, default=20, help="Bollinger Bands window (default: 20)")
-    parser.add_argument("--bb-std", type=float, default=2.0, help="Bollinger Bands std dev (default: 2.0)")
+    parser.add_argument(
+        "--bb-window", type=int, default=20, help="Bollinger Bands window (default: 20)"
+    )
+    parser.add_argument(
+        "--bb-std", type=float, default=2.0, help="Bollinger Bands std dev (default: 2.0)"
+    )
     parser.add_argument("--rsi-period", type=int, default=14, help="RSI period (default: 14)")
-    parser.add_argument("--rsi-oversold", type=float, default=30.0, help="RSI oversold level (default: 30)")
-    parser.add_argument("--rsi-overbought", type=float, default=70.0, help="RSI overbought level (default: 70)")
-    parser.add_argument("--no-rsi-filter", action="store_true", help="Disable RSI filter for mean reversion")
+    parser.add_argument(
+        "--rsi-oversold", type=float, default=30.0, help="RSI oversold level (default: 30)"
+    )
+    parser.add_argument(
+        "--rsi-overbought", type=float, default=70.0, help="RSI overbought level (default: 70)"
+    )
+    parser.add_argument(
+        "--no-rsi-filter", action="store_true", help="Disable RSI filter for mean reversion"
+    )
 
     # regime detection (adaptive mode)
-    parser.add_argument("--adx-period", type=int, default=14, help="ADX period for regime detection (default: 14)")
-    parser.add_argument("--adx-threshold", type=float, default=25.0, help="ADX trending threshold (default: 25)")
-    parser.add_argument("--hurst-window", type=int, default=100, help="Hurst exponent window (default: 100)")
+    parser.add_argument(
+        "--adx-period", type=int, default=14, help="ADX period for regime detection (default: 14)"
+    )
+    parser.add_argument(
+        "--adx-threshold", type=float, default=25.0, help="ADX trending threshold (default: 25)"
+    )
+    parser.add_argument(
+        "--hurst-window", type=int, default=100, help="Hurst exponent window (default: 100)"
+    )
 
     # vol targeting
-    parser.add_argument("--vol-target", type=float, default=0.15, help="Annualised vol target (default: 0.15)")
-    parser.add_argument("--vol-window", type=int, default=20, help="Realised vol window (default: 20)")
+    parser.add_argument(
+        "--vol-target", type=float, default=0.15, help="Annualised vol target (default: 0.15)"
+    )
+    parser.add_argument(
+        "--vol-window", type=int, default=20, help="Realised vol window (default: 20)"
+    )
 
     # risk management
     parser.add_argument("--no-risk", action="store_true", help="Disable all risk controls")
-    parser.add_argument("--stop-loss", type=float, default=0.05, help="Stop-loss threshold (default: 0.05)")
-    parser.add_argument("--take-profit", type=float, default=0.10, help="Take-profit threshold (default: 0.10)")
-    parser.add_argument("--trailing-stop", type=float, default=0.03, help="Trailing stop threshold (default: 0.03)")
-    parser.add_argument("--max-position", type=float, default=1.0, help="Max position size (default: 1.0)")
-    parser.add_argument("--daily-loss-limit", type=float, default=0.02, help="Daily loss limit (default: 0.02)")
+    parser.add_argument(
+        "--stop-loss", type=float, default=0.05, help="Stop-loss threshold (default: 0.05)"
+    )
+    parser.add_argument(
+        "--take-profit", type=float, default=0.10, help="Take-profit threshold (default: 0.10)"
+    )
+    parser.add_argument(
+        "--trailing-stop", type=float, default=0.03, help="Trailing stop threshold (default: 0.03)"
+    )
+    parser.add_argument(
+        "--max-position", type=float, default=1.0, help="Max position size (default: 1.0)"
+    )
+    parser.add_argument(
+        "--daily-loss-limit", type=float, default=0.02, help="Daily loss limit (default: 0.02)"
+    )
 
     # walk-forward validation
     parser.add_argument("--walk-forward", action="store_true", help="Run walk-forward validation")
-    parser.add_argument("--wf-is-days", type=int, default=504, help="Walk-forward in-sample days (default: 504)")
-    parser.add_argument("--wf-oos-days", type=int, default=126, help="Walk-forward out-of-sample days (default: 126)")
+    parser.add_argument(
+        "--wf-is-days", type=int, default=504, help="Walk-forward in-sample days (default: 504)"
+    )
+    parser.add_argument(
+        "--wf-oos-days",
+        type=int,
+        default=126,
+        help="Walk-forward out-of-sample days (default: 126)",
+    )
 
     # costs
-    parser.add_argument("--cost", type=float, default=0.001, help="Transaction cost (default: 0.001)")
+    parser.add_argument(
+        "--cost", type=float, default=0.001, help="Transaction cost (default: 0.001)"
+    )
 
     # output
-    parser.add_argument("--output-dir", default="results", help="Output directory (default: results)")
+    parser.add_argument(
+        "--output-dir", default="results", help="Output directory (default: results)"
+    )
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable debug logging")
 
     return parser.parse_args()
@@ -106,7 +158,9 @@ def setup_logging(verbose: bool = False) -> None:
     )
 
 
-def _build_strategy_fn(args: argparse.Namespace):
+def _build_strategy_fn(
+    args: argparse.Namespace,
+) -> Callable[[pd.DataFrame], pd.DataFrame]:
     """Return a strategy function based on CLI args."""
     mom_fn = partial(
         momentum_strategy,
@@ -142,7 +196,9 @@ def _build_strategy_fn(args: argparse.Namespace):
         return mom_fn
 
 
-def _build_backtest_fn(args: argparse.Namespace, risk_config: RiskConfig | None):
+def _build_backtest_fn(
+    args: argparse.Namespace, risk_config: RiskConfig | None
+) -> Callable[[pd.DataFrame], tuple[pd.DataFrame, pd.DataFrame]]:
     """Return a backtest function based on CLI args."""
     return partial(
         backtest_strategy,
@@ -233,8 +289,11 @@ def main() -> None:
     # --- trade-level analytics ---
     trade_stats = calculate_trade_stats(trade_log)
     if trade_stats["Total Trades"] > 0:
-        print(f"\n=== Trade Analytics ===")
-        print(f"  Win Rate:        {trade_stats['Win Rate']:.1%}  ({trade_stats['Winners']}W / {trade_stats['Losers']}L)")
+        print("\n=== Trade Analytics ===")
+        print(
+            f"  Win Rate:        {trade_stats['Win Rate']:.1%}  "
+            f"({trade_stats['Winners']}W / {trade_stats['Losers']}L)"
+        )
         print(f"  Profit Factor:   {trade_stats['Profit Factor']:.2f}")
         print(f"  Expectancy:      {trade_stats['Expectancy']:.4f}")
         print(f"  Payoff Ratio:    {trade_stats['Payoff Ratio']:.2f}")
@@ -247,7 +306,9 @@ def main() -> None:
         if trade_stats["Avg Holding Days"] > 0:
             print(f"  Avg Holding:     {trade_stats['Avg Holding Days']:.0f} days")
         if trade_stats["Long Trades"] + trade_stats["Short Trades"] > 0:
-            print(f"  Long/Short:      {trade_stats['Long Trades']}L / {trade_stats['Short Trades']}S")
+            print(
+                f"  Long/Short:      {trade_stats['Long Trades']}L / {trade_stats['Short Trades']}S"
+            )
 
     # --- trade log ---
     print("\n=== Trade Log (last 5) ===")
@@ -270,8 +331,18 @@ def main() -> None:
     backtest_df["buy_hold_equity"] = (1 + backtest_df["buy_hold_returns"]).cumprod()
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(backtest_df.index, backtest_df["equity_curve"], label=f"{strategy_label} Strategy", linewidth=1.2)
-    ax.plot(backtest_df.index, backtest_df["buy_hold_equity"], label=f"Buy & Hold {args.ticker}", linewidth=1.2)
+    ax.plot(
+        backtest_df.index,
+        backtest_df["equity_curve"],
+        label=f"{strategy_label} Strategy",
+        linewidth=1.2,
+    )
+    ax.plot(
+        backtest_df.index,
+        backtest_df["buy_hold_equity"],
+        label=f"Buy & Hold {args.ticker}",
+        linewidth=1.2,
+    )
     ax.set_title(f"{args.ticker} {strategy_label} vs Buy-and-Hold")
     ax.set_xlabel("Date")
     ax.set_ylabel("Equity")
@@ -287,8 +358,13 @@ def main() -> None:
     # summary table
     print("\n=== Backtest Data (last 10 rows) ===")
     cols_to_show = [
-        "close", "signal", "position", "scaled_position",
-        "strategy_returns", "equity_curve", "buy_hold_equity",
+        "close",
+        "signal",
+        "position",
+        "scaled_position",
+        "strategy_returns",
+        "equity_curve",
+        "buy_hold_equity",
     ]
     existing_cols = [c for c in cols_to_show if c in backtest_df.columns]
     print(backtest_df[existing_cols].tail(10))

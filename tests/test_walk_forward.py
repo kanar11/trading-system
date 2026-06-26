@@ -4,12 +4,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.strategy.momentum import momentum_strategy
 from src.backtest.engine import backtest_strategy
+from src.strategy.momentum import momentum_strategy
 from src.validation.walk_forward import (
     WalkForwardConfig,
-    run_walk_forward,
     print_walk_forward_report,
+    run_walk_forward,
 )
 
 
@@ -31,17 +31,17 @@ def _backtest_fn(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 class TestWalkForwardConfig:
-    def test_default_step_equals_oos(self):
+    def test_default_step_equals_oos(self) -> None:
         cfg = WalkForwardConfig(in_sample_days=252, out_of_sample_days=63)
         assert cfg.step_days == 63
 
-    def test_custom_step(self):
+    def test_custom_step(self) -> None:
         cfg = WalkForwardConfig(in_sample_days=252, out_of_sample_days=63, step_days=21)
         assert cfg.step_days == 21
 
 
 class TestRunWalkForward:
-    def test_returns_expected_keys(self):
+    def test_returns_expected_keys(self) -> None:
         df = _make_long_price_df(800)
         config = WalkForwardConfig(in_sample_days=300, out_of_sample_days=100)
         results = run_walk_forward(df, _strategy_fn, _backtest_fn, config)
@@ -51,14 +51,14 @@ class TestRunWalkForward:
         assert "oos_equity" in results
         assert "degradation" in results
 
-    def test_produces_multiple_folds(self):
+    def test_produces_multiple_folds(self) -> None:
         df = _make_long_price_df(800)
         config = WalkForwardConfig(in_sample_days=200, out_of_sample_days=100)
         results = run_walk_forward(df, _strategy_fn, _backtest_fn, config)
 
         assert len(results["folds"]) >= 2
 
-    def test_fold_has_correct_fields(self):
+    def test_fold_has_correct_fields(self) -> None:
         df = _make_long_price_df(800)
         config = WalkForwardConfig(in_sample_days=300, out_of_sample_days=100)
         results = run_walk_forward(df, _strategy_fn, _backtest_fn, config)
@@ -70,7 +70,7 @@ class TestRunWalkForward:
         assert "Sharpe Ratio" in fold.oos_metrics
         assert "Sharpe Ratio" in fold.is_metrics
 
-    def test_summary_has_avg_sharpe(self):
+    def test_summary_has_avg_sharpe(self) -> None:
         df = _make_long_price_df(800)
         config = WalkForwardConfig(in_sample_days=300, out_of_sample_days=100)
         results = run_walk_forward(df, _strategy_fn, _backtest_fn, config)
@@ -79,14 +79,14 @@ class TestRunWalkForward:
         assert "Std OOS Sharpe" in results["summary"]
         assert "Total Folds" in results["summary"]
 
-    def test_raises_on_insufficient_data(self):
+    def test_raises_on_insufficient_data(self) -> None:
         df = _make_long_price_df(100)
         config = WalkForwardConfig(in_sample_days=300, out_of_sample_days=100)
 
         with pytest.raises(ValueError, match="Not enough data"):
             run_walk_forward(df, _strategy_fn, _backtest_fn, config)
 
-    def test_oos_equity_is_series(self):
+    def test_oos_equity_is_series(self) -> None:
         df = _make_long_price_df(800)
         config = WalkForwardConfig(in_sample_days=300, out_of_sample_days=100)
         results = run_walk_forward(df, _strategy_fn, _backtest_fn, config)
@@ -94,7 +94,7 @@ class TestRunWalkForward:
         assert isinstance(results["oos_equity"], pd.Series)
         assert len(results["oos_equity"]) > 0
 
-    def test_degradation_keys(self):
+    def test_degradation_keys(self) -> None:
         df = _make_long_price_df(800)
         config = WalkForwardConfig(in_sample_days=300, out_of_sample_days=100)
         results = run_walk_forward(df, _strategy_fn, _backtest_fn, config)
@@ -103,3 +103,14 @@ class TestRunWalkForward:
         assert "avg_is_sharpe" in d
         assert "avg_oos_sharpe" in d
         assert "sharpe_degradation_pct" in d
+
+
+def test_print_report_outputs_sections(capsys: pytest.CaptureFixture[str]) -> None:
+    df = _make_long_price_df(800)
+    config = WalkForwardConfig(in_sample_days=300, out_of_sample_days=100)
+    results = run_walk_forward(df, _strategy_fn, _backtest_fn, config)
+
+    print_walk_forward_report(results)
+    out = capsys.readouterr().out
+    assert "WALK-FORWARD VALIDATION REPORT" in out
+    assert "IS vs OOS Degradation" in out

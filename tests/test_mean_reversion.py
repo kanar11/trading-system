@@ -5,9 +5,9 @@ import pandas as pd
 import pytest
 
 from src.strategy.mean_reversion import (
-    mean_reversion_strategy,
     _bollinger_bands,
     _rsi,
+    mean_reversion_strategy,
 )
 
 
@@ -17,7 +17,7 @@ def _make_price_df(prices: list[float]) -> pd.DataFrame:
 
 
 class TestBollingerBands:
-    def test_returns_three_series(self):
+    def test_returns_three_series(self) -> None:
         s = pd.Series([100 + i for i in range(30)])
         middle, upper, lower = _bollinger_bands(s, window=10)
 
@@ -25,7 +25,7 @@ class TestBollingerBands:
         assert len(upper) == 30
         assert len(lower) == 30
 
-    def test_upper_above_lower(self):
+    def test_upper_above_lower(self) -> None:
         s = pd.Series([100 + i * 0.5 for i in range(30)])
         middle, upper, lower = _bollinger_bands(s, window=10)
 
@@ -33,7 +33,7 @@ class TestBollingerBands:
         valid = middle.dropna().index
         assert (upper[valid] >= lower[valid]).all()
 
-    def test_middle_is_rolling_mean(self):
+    def test_middle_is_rolling_mean(self) -> None:
         s = pd.Series([100 + i for i in range(30)])
         middle, _, _ = _bollinger_bands(s, window=10)
         expected = s.rolling(10).mean()
@@ -42,7 +42,7 @@ class TestBollingerBands:
 
 
 class TestRSI:
-    def test_rsi_range(self):
+    def test_rsi_range(self) -> None:
         prices = pd.Series([100 + np.sin(i / 3) * 5 for i in range(50)])
         rsi = _rsi(prices, period=14)
 
@@ -50,7 +50,7 @@ class TestRSI:
         assert (valid >= 0).all()
         assert (valid <= 100).all()
 
-    def test_rsi_rising_prices(self):
+    def test_rsi_rising_prices(self) -> None:
         prices = pd.Series([100 + i for i in range(30)])
         rsi = _rsi(prices, period=14)
 
@@ -59,14 +59,14 @@ class TestRSI:
 
 
 class TestMeanReversionStrategy:
-    def test_signal_column_exists(self):
+    def test_signal_column_exists(self) -> None:
         prices = [100 + np.sin(i / 5) * 10 for i in range(100)]
         df = _make_price_df(prices)
         result = mean_reversion_strategy(df, bb_window=20)
 
         assert "signal" in result.columns
 
-    def test_indicator_columns_exist(self):
+    def test_indicator_columns_exist(self) -> None:
         prices = [100 + np.sin(i / 5) * 10 for i in range(100)]
         df = _make_price_df(prices)
         result = mean_reversion_strategy(df, bb_window=20)
@@ -74,7 +74,7 @@ class TestMeanReversionStrategy:
         for col in ["bb_middle", "bb_upper", "bb_lower", "rsi", "percent_b"]:
             assert col in result.columns, f"Missing column: {col}"
 
-    def test_signals_are_valid_values(self):
+    def test_signals_are_valid_values(self) -> None:
         prices = [100 + np.sin(i / 3) * 15 for i in range(100)]
         df = _make_price_df(prices)
         result = mean_reversion_strategy(df, bb_window=20)
@@ -82,9 +82,19 @@ class TestMeanReversionStrategy:
         unique = set(result["signal"].unique())
         assert unique.issubset({-1, 0, 1})
 
-    def test_no_rsi_filter(self):
+    def test_no_rsi_filter(self) -> None:
         prices = [100 + np.sin(i / 3) * 15 for i in range(100)]
         df = _make_price_df(prices)
         result = mean_reversion_strategy(df, bb_window=20, use_rsi_filter=False)
 
         assert "signal" in result.columns
+
+    def test_missing_close_raises(self) -> None:
+        df = pd.DataFrame({"price": [1.0, 2.0, 3.0]})
+        with pytest.raises(ValueError, match="close"):
+            mean_reversion_strategy(df)
+
+    def test_invalid_bb_window_raises(self) -> None:
+        df = _make_price_df([100.0, 101.0, 102.0])
+        with pytest.raises(ValueError, match="bb_window"):
+            mean_reversion_strategy(df, bb_window=0)

@@ -5,13 +5,13 @@ import pytest
 
 from src.reporting.metrics import calculate_metrics, calculate_trade_stats
 
-
 # ---------------------------------------------------------------------------
 # Portfolio-level metrics
 # ---------------------------------------------------------------------------
 
+
 class TestCalculateMetrics:
-    def test_positive_returns(self):
+    def test_positive_returns(self) -> None:
         returns = pd.Series([0.01, 0.02, -0.005, 0.015, 0.01])
         metrics = calculate_metrics(returns)
 
@@ -19,37 +19,58 @@ class TestCalculateMetrics:
         assert metrics["Sharpe Ratio"] > 0
         assert metrics["Max Drawdown"] <= 0
 
-    def test_empty_returns(self):
+    def test_empty_returns(self) -> None:
         metrics = calculate_metrics(pd.Series([], dtype=float))
 
         assert metrics["Total Return"] == 0.0
         assert metrics["Sharpe Ratio"] == 0.0
         assert metrics["Calmar Ratio"] == 0.0
 
-    def test_all_negative(self):
+    def test_all_negative(self) -> None:
         metrics = calculate_metrics(pd.Series([-0.01, -0.02, -0.015]))
 
         assert metrics["Total Return"] < 0
         assert metrics["Max Drawdown"] < 0
         assert metrics["Sharpe Ratio"] < 0
 
-    def test_keys(self):
+    def test_keys(self) -> None:
         metrics = calculate_metrics(pd.Series([0.01, -0.005]))
 
         expected = {
-            "Total Return", "CAGR", "Sharpe Ratio",
-            "Sortino Ratio", "Max Drawdown", "Calmar Ratio",
+            "Total Return",
+            "CAGR",
+            "Sharpe Ratio",
+            "Sortino Ratio",
+            "Max Drawdown",
+            "Calmar Ratio",
         }
         assert set(metrics.keys()) == expected
+
+    def test_risk_free_rate_lowers_sharpe(self) -> None:
+        returns = pd.Series([0.01, 0.02, 0.005, 0.015, 0.01])
+        base = calculate_metrics(returns, risk_free_rate=0.0)
+        with_rf = calculate_metrics(returns, risk_free_rate=0.05)
+
+        assert with_rf["Sharpe Ratio"] < base["Sharpe Ratio"]
+
+    def test_total_loss_caps_cagr(self) -> None:
+        # a -100% period wipes out capital; CAGR floored at -1.0
+        metrics = calculate_metrics(pd.Series([-1.0, 0.0]))
+        assert metrics["CAGR"] == -1.0
 
 
 # ---------------------------------------------------------------------------
 # Trade-level analytics
 # ---------------------------------------------------------------------------
 
-def _make_trade_log(returns, directions=None, holding_days=None):
+
+def _make_trade_log(
+    returns: list[float],
+    directions: list[int] | None = None,
+    holding_days: list[int] | None = None,
+) -> pd.DataFrame:
     """Helper to build a trade log DataFrame."""
-    data = {"trade_return": returns}
+    data: dict[str, list[float] | list[int]] = {"trade_return": returns}
     if directions is not None:
         data["direction"] = directions
     if holding_days is not None:
@@ -58,7 +79,7 @@ def _make_trade_log(returns, directions=None, holding_days=None):
 
 
 class TestTradeStats:
-    def test_basic_win_rate(self):
+    def test_basic_win_rate(self) -> None:
         log = _make_trade_log([0.05, -0.02, 0.03, -0.01, 0.04])
         stats = calculate_trade_stats(log)
 
@@ -67,21 +88,21 @@ class TestTradeStats:
         assert stats["Losers"] == 2
         assert stats["Win Rate"] == pytest.approx(0.6)
 
-    def test_profit_factor(self):
+    def test_profit_factor(self) -> None:
         log = _make_trade_log([0.10, -0.05, 0.08])
         stats = calculate_trade_stats(log)
 
         # gross win = 0.18, gross loss = 0.05
         assert stats["Profit Factor"] == pytest.approx(0.18 / 0.05, rel=1e-6)
 
-    def test_expectancy(self):
+    def test_expectancy(self) -> None:
         returns = [0.05, -0.02, 0.03]
         log = _make_trade_log(returns)
         stats = calculate_trade_stats(log)
 
         assert stats["Expectancy"] == pytest.approx(sum(returns) / len(returns))
 
-    def test_payoff_ratio(self):
+    def test_payoff_ratio(self) -> None:
         log = _make_trade_log([0.10, 0.06, -0.04, -0.02])
         stats = calculate_trade_stats(log)
 
@@ -89,21 +110,21 @@ class TestTradeStats:
         avg_loss = (-0.04 + -0.02) / 2
         assert stats["Payoff Ratio"] == pytest.approx(abs(avg_win / avg_loss))
 
-    def test_streaks(self):
+    def test_streaks(self) -> None:
         log = _make_trade_log([0.01, 0.02, 0.03, -0.01, -0.02, 0.01])
         stats = calculate_trade_stats(log)
 
         assert stats["Max Win Streak"] == 3
         assert stats["Max Loss Streak"] == 2
 
-    def test_largest_win_loss(self):
+    def test_largest_win_loss(self) -> None:
         log = _make_trade_log([0.01, 0.15, -0.03, -0.08, 0.05])
         stats = calculate_trade_stats(log)
 
         assert stats["Largest Win"] == pytest.approx(0.15)
         assert stats["Largest Loss"] == pytest.approx(-0.08)
 
-    def test_holding_days(self):
+    def test_holding_days(self) -> None:
         log = _make_trade_log(
             [0.05, -0.02, 0.03],
             holding_days=[10, 5, 15],
@@ -114,21 +135,21 @@ class TestTradeStats:
         assert stats["Avg Holding (Win)"] == pytest.approx(12.5)
         assert stats["Avg Holding (Loss)"] == pytest.approx(5.0)
 
-    def test_direction_breakdown(self):
+    def test_direction_breakdown(self) -> None:
         log = _make_trade_log([0.05, -0.02, 0.03], directions=[1, -1, 1])
         stats = calculate_trade_stats(log)
 
         assert stats["Long Trades"] == 2
         assert stats["Short Trades"] == 1
 
-    def test_empty_trade_log(self):
+    def test_empty_trade_log(self) -> None:
         stats = calculate_trade_stats(pd.DataFrame())
 
         assert stats["Total Trades"] == 0
         assert stats["Win Rate"] == 0.0
         assert stats["Profit Factor"] == 0.0
 
-    def test_all_winners(self):
+    def test_all_winners(self) -> None:
         log = _make_trade_log([0.05, 0.03, 0.02])
         stats = calculate_trade_stats(log)
 
@@ -136,7 +157,7 @@ class TestTradeStats:
         assert stats["Profit Factor"] == float("inf")
         assert stats["Losers"] == 0
 
-    def test_all_losers(self):
+    def test_all_losers(self) -> None:
         log = _make_trade_log([-0.05, -0.03, -0.02])
         stats = calculate_trade_stats(log)
 

@@ -6,13 +6,14 @@ combinations and exports ranked results to CSV.
 
 import logging
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
-from src.data.loader import load_yahoo_ohlcv
-from src.strategy.momentum import momentum_strategy
 from src.backtest.engine import backtest_strategy
+from src.data.loader import load_yahoo_ohlcv
 from src.reporting.metrics import calculate_metrics, calculate_trade_stats
+from src.strategy.momentum import momentum_strategy
 
 logger = logging.getLogger(__name__)
 
@@ -23,17 +24,21 @@ def run_sweep(
     transaction_cost: float = 0.001,
     lookbacks: list[int] | None = None,
     thresholds: list[float] | None = None,
-    output_dir: str = "results",
+    output_dir: str | Path = "results",
+    df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Run a parameter sweep and return ranked results.
 
     Args:
-        ticker: Instrument symbol.
-        start_date: Data start date.
+        ticker: Instrument symbol (used for labelling and, if ``df`` is
+            not supplied, for downloading data).
+        start_date: Data start date when downloading.
         transaction_cost: Cost per trade as a fraction.
         lookbacks: List of lookback periods to test.
         thresholds: List of momentum thresholds to test.
         output_dir: Directory to save CSV output.
+        df: Optional pre-loaded OHLCV DataFrame. If provided, no download
+            occurs (useful for testing and offline runs).
 
     Returns:
         DataFrame of results sorted by Sharpe Ratio descending.
@@ -43,11 +48,12 @@ def run_sweep(
     if thresholds is None:
         thresholds = [0.0, 0.005, 0.01, 0.02]
 
-    logger.info("Loading %s data from %s...", ticker, start_date)
-    df = load_yahoo_ohlcv(ticker=ticker, start=start_date)
+    if df is None:
+        logger.info("Loading %s data from %s...", ticker, start_date)
+        df = load_yahoo_ohlcv(ticker=ticker, start=start_date)
 
     total = len(lookbacks) * len(thresholds)
-    results: list[dict] = []
+    results: list[dict[str, Any]] = []
 
     for i, lookback in enumerate(lookbacks):
         for j, threshold in enumerate(thresholds):
@@ -96,10 +102,9 @@ def run_sweep(
     )
 
     out = Path(output_dir)
-    out.mkdir(exist_ok=True)
+    out.mkdir(parents=True, exist_ok=True)
     output_file = out / "sweep_results.csv"
     results_df.to_csv(output_file, index=False)
-
     logger.info("Saved: %s", output_file)
 
     print("\n=== Top 10 Results ===")

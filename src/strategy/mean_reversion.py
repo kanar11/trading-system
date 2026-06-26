@@ -89,7 +89,17 @@ def mean_reversion_strategy(
 
     Returns:
         DataFrame with added indicator and 'signal' columns.
+
+    Raises:
+        ValueError: If 'close' is missing or a window/period is < 1.
     """
+    if "close" not in df.columns:
+        raise ValueError("DataFrame must contain a 'close' column.")
+    if bb_window < 1:
+        raise ValueError(f"bb_window must be >= 1, got {bb_window}.")
+    if rsi_period < 1:
+        raise ValueError(f"rsi_period must be >= 1, got {rsi_period}.")
+
     df = df.copy()
 
     # Bollinger Bands

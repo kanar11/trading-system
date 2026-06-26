@@ -1,8 +1,12 @@
 """Shared pytest fixtures for the test suite."""
 
+import matplotlib
 import numpy as np
 import pandas as pd
 import pytest
+
+# Force a headless backend so plotting tests never require a display.
+matplotlib.use("Agg")
 
 
 @pytest.fixture
@@ -39,7 +43,7 @@ def sample_ohlcv() -> pd.DataFrame:
 
 
 @pytest.fixture
-def sample_prices(sample_ohlcv) -> pd.DataFrame:
+def sample_prices(sample_ohlcv: pd.DataFrame) -> pd.DataFrame:
     """DataFrame with close prices only (subset of sample_ohlcv)."""
     return sample_ohlcv[["close"]].copy()
 
@@ -47,6 +51,4 @@ def sample_prices(sample_ohlcv) -> pd.DataFrame:
 @pytest.fixture
 def sample_returns() -> pd.Series:
     """Series of mixed daily returns."""
-    return pd.Series(
-        [0.01, 0.02, -0.005, 0.015, -0.01, 0.008, -0.003, 0.012, 0.005, -0.007]
-    )
+    return pd.Series([0.01, 0.02, -0.005, 0.015, -0.01, 0.008, -0.003, 0.012, 0.005, -0.007])

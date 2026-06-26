@@ -1,17 +1,19 @@
 """Tests for the backtest engine."""
 
+from collections.abc import Sequence
+
 import pandas as pd
 import pytest
 
 from src.backtest.engine import backtest_strategy
 
 
-def _make_signal_df(prices: list[float], signals: list[int]) -> pd.DataFrame:
+def _make_signal_df(prices: Sequence[float], signals: Sequence[int]) -> pd.DataFrame:
     dates = pd.date_range("2020-01-01", periods=len(prices), freq="B")
     return pd.DataFrame({"close": prices, "signal": signals}, index=dates)
 
 
-def test_backtest_returns_dataframe_and_trade_log():
+def test_backtest_returns_dataframe_and_trade_log() -> None:
     df = _make_signal_df([100, 101, 102, 103, 104], [0, 1, 1, 1, 0])
     result_df, trade_log = backtest_strategy(df, transaction_cost=0.001)
 
@@ -20,7 +22,7 @@ def test_backtest_returns_dataframe_and_trade_log():
     assert isinstance(trade_log, pd.DataFrame)
 
 
-def test_backtest_equity_starts_at_one():
+def test_backtest_equity_starts_at_one() -> None:
     df = _make_signal_df([100, 101, 102, 103, 104], [0, 0, 0, 0, 0])
     result_df, _ = backtest_strategy(df)
 
@@ -28,7 +30,7 @@ def test_backtest_equity_starts_at_one():
     assert abs(result_df["equity_curve"].iloc[-1] - 1.0) < 1e-10
 
 
-def test_backtest_raises_without_signal():
+def test_backtest_raises_without_signal() -> None:
     dates = pd.date_range("2020-01-01", periods=3, freq="B")
     df = pd.DataFrame({"close": [100, 101, 102]}, index=dates)
 
@@ -36,7 +38,7 @@ def test_backtest_raises_without_signal():
         backtest_strategy(df)
 
 
-def test_backtest_raises_without_close():
+def test_backtest_raises_without_close() -> None:
     dates = pd.date_range("2020-01-01", periods=3, freq="B")
     df = pd.DataFrame({"signal": [0, 1, 1]}, index=dates)
 
@@ -44,7 +46,7 @@ def test_backtest_raises_without_close():
         backtest_strategy(df)
 
 
-def test_backtest_with_vol_target():
+def test_backtest_with_vol_target() -> None:
     prices = [100 + i for i in range(50)]
     signals = [0] * 5 + [1] * 40 + [0] * 5
     df = _make_signal_df(prices, signals)

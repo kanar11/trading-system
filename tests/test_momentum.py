@@ -1,23 +1,25 @@
 """Tests for momentum signal generation."""
 
+from collections.abc import Sequence
+
 import pandas as pd
 import pytest
 
 from src.strategy.momentum import momentum_strategy
 
 
-def _make_price_df(prices: list[float]) -> pd.DataFrame:
+def _make_price_df(prices: Sequence[float]) -> pd.DataFrame:
     dates = pd.date_range("2020-01-01", periods=len(prices), freq="B")
     return pd.DataFrame({"close": prices}, index=dates)
 
 
-def test_signal_column_exists():
+def test_signal_column_exists() -> None:
     df = _make_price_df([100 + i for i in range(30)])
     result = momentum_strategy(df, lookback=5, threshold=0.01)
     assert "signal" in result.columns
 
 
-def test_long_signal_on_rising_prices():
+def test_long_signal_on_rising_prices() -> None:
     # steadily rising prices should produce long signals
     prices = [100 + i * 2 for i in range(30)]
     df = _make_price_df(prices)
@@ -28,7 +30,7 @@ def test_long_signal_on_rising_prices():
     assert (signals_after_warmup >= 0).all()
 
 
-def test_flat_signal_below_threshold():
+def test_flat_signal_below_threshold() -> None:
     # nearly flat prices should produce zero signals
     prices = [100 + (i % 2) * 0.001 for i in range(30)]
     df = _make_price_df(prices)
@@ -38,7 +40,7 @@ def test_flat_signal_below_threshold():
     assert (signals_after_warmup == 0).all()
 
 
-def test_sma_filter_removes_longs_below_sma():
+def test_sma_filter_removes_longs_below_sma() -> None:
     # create data where price < SMA200 but has positive momentum
     prices = list(range(300, 100, -1))  # declining from 300 to 101
     # add a small uptick at end
@@ -49,3 +51,15 @@ def test_sma_filter_removes_longs_below_sma():
 
     # with SMA filter, longs below SMA200 should be suppressed
     assert "sma200" in result.columns
+
+
+def test_missing_close_raises() -> None:
+    df = pd.DataFrame({"price": [1.0, 2.0, 3.0]})
+    with pytest.raises(ValueError, match="close"):
+        momentum_strategy(df)
+
+
+def test_invalid_lookback_raises() -> None:
+    df = _make_price_df([100 + i for i in range(10)])
+    with pytest.raises(ValueError, match="lookback"):
+        momentum_strategy(df, lookback=0)

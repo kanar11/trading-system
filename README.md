@@ -117,6 +117,21 @@ python main.py -v
 pytest tests/ -v
 ```
 
+### 5. Code quality checks
+
+Install the dev tooling and run the full check suite (lint, formatting, types):
+
+```bash
+pip install -e ".[dev]"
+
+ruff check .          # lint
+ruff format --check . # formatting
+mypy src/ main.py grid_search.py plot_heatmap.py tests/  # strict type checks
+```
+
+All four checks (pytest, ruff lint, ruff format, mypy strict) are expected to
+pass cleanly.
+
 ## Strategies
 
 ### Momentum
@@ -232,7 +247,7 @@ This is a research prototype, not a production trading system. Current limitatio
 - pandas, NumPy
 - matplotlib, seaborn
 - yfinance
-- pytest
+- pytest, ruff, mypy (with pandas-stubs)
 
 ## Author
 
