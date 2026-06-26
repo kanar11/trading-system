@@ -48,7 +48,7 @@ The system currently:
 - maintains a comprehensive technical-indicators library (`src.indicators`): SMA / EMA / WMA / VWMA, RSI, MACD, Stochastic, Williams %R, CCI, ROC, ATR (SMA/EMA/Wilder smoothings), Bollinger, Keltner, Donchian, OBV, anchored VWAP, Chaikin A/D
 - generates trading signals using seven strategy templates: momentum, mean reversion, Donchian breakout, EMA crossover, MACD, pairs (cointegration), and adaptive (regime-based)
 - combines multiple strategies via majority vote, weighted sum or unanimous-consent ensemble combiners
-- detects market regimes (trending vs mean-reverting) using ADX and Hurst exponent
+- detects market regimes (trending vs mean-reverting) using ADX and Hurst exponent, or a data-driven Gaussian HMM (Baum-Welch EM + Viterbi, pure numpy)
 - runs **vectorised** backtests with transaction costs, volatility targeting and a risk middleware (stop-loss, take-profit, trailing stop, position limits, daily loss limit)
 - runs **event-driven** backtests through a full OMS — MARKET / LIMIT / STOP / STOP_LIMIT orders, DAY / GTC / IOC / FOK TIF, intrabar limit matching, gap-safe stop fills, partial fills, weighted-avg cost basis, realized vs unrealized PnL splits
 - models realistic execution costs (bid-ask spread + square-root market impact + fixed commission)
@@ -102,7 +102,8 @@ trading_system/
 │   │   ├── sizing.py              # Kelly / ATR / fixed-fractional sizing
 │   │   └── metrics.py             # VaR / CVaR / Omega / Ulcer / drawdown stats / rolling beta
 │   ├── regime/
-│   │   └── detector.py            # Market regime detection (ADX + Hurst)
+│   │   ├── detector.py            # Market regime detection (ADX + Hurst)
+│   │   └── hmm.py                 # Gaussian HMM regime detector (Baum-Welch + Viterbi)
 │   ├── validation/
 │   │   ├── walk_forward.py        # Walk-forward validation framework
 │   │   ├── monte_carlo.py         # Bootstrap + trade-shuffle robustness
@@ -347,6 +348,20 @@ The regime detector (`src/regime/detector.py`) classifies each day into one of t
 - **Hurst exponent** estimates persistence in the price series. H > 0.55 suggests trending behaviour; H < 0.45 suggests mean reversion; H near 0.5 is a random walk.
 
 The final classification requires both indicators to agree. A rolling majority-vote smoothing window prevents whipsawing between regimes. Volatility regime (high/low) is also computed as a secondary signal.
+
+### Hidden Markov model
+
+For a probabilistic, data-driven alternative, `src/regime/hmm.py` fits a univariate Gaussian HMM to the return series with the Baum-Welch (EM) algorithm and decodes the most-likely regime path with Viterbi — pure numpy, no scipy. Fitting is deterministic (quantile initialisation) and states are relabelled by ascending mean, so a two-state model cleanly separates a calm, higher-mean regime from a turbulent, lower-mean one without label-switching.
+
+```python
+from src.regime import HMMConfig, detect_hmm_regime, fit_gaussian_hmm
+
+states = detect_hmm_regime(returns, n_states=2)      # Series of 0/1 regime labels
+result = fit_gaussian_hmm(returns.to_numpy(), HMMConfig(n_states=3))
+print(result.state_means, result.transition, result.log_likelihood)
+```
+
+The scaled forward-backward pass keeps the likelihood numerically stable on long series, and `HMMResult.posterior` exposes the smoothed `P(state | data)` for soft-allocation use.
 
 ## Risk management
 
@@ -656,7 +671,7 @@ Results are saved to `results/sweep_results.csv` and the top 10 configurations a
 The codebase is research-grade — it ships the architecture and components of a professional trading stack, but is not a production execution venue. Current limitations:
 
 - Default data source is Yahoo Finance (free, end-of-day quality).
-- Regime detection uses ADX + Hurst rather than a hidden Markov model.
+- Regime detection offers both an ADX + Hurst indicator vote and a Gaussian HMM; richer models (non-Gaussian emissions, regime-switching GARCH) are future work.
 - Execution-cost model is reduced-form: spread + sqrt-impact + commission. No order-book simulation, no queue position, no cross-venue routing.
 - Portfolio optimisers clip negative weights and renormalise rather than solving a constrained QP (sufficient for research baskets but not for institutional sizing).
 - Monte Carlo resampling assumes stationary returns (use block bootstrap for short-range autocorrelation).
