@@ -13,6 +13,9 @@ dependencies = [
     "matplotlib>=3.7",
     "yfinance>=0.2",
     "seaborn>=0.12",
+    "pydantic>=2.5",
+    "pydantic-settings>=2.2",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -24,7 +27,11 @@ dev = [
     "pre-commit>=3.5",
     "pandas-stubs>=2.0",
     "types-seaborn>=0.13",
+    "types-PyYAML>=6.0",
 ]
+
+[project.scripts]
+quantbt-backtest = "quantbt.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["quantbt*"]
@@ -52,6 +59,7 @@ select = [
 
 [tool.mypy]
 python_version = "3.11"
+plugins = ["pydantic.mypy"]
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

@@ -1,0 +1,51 @@
+# Example run configuration. Use with:
+#   quantbt-backtest --config configs/example.yaml
+# CLI flags override these values; QUANTBT_* env vars fill any field left unset.
+
+strategy: adaptive
+
+data:
+  ticker: SPY
+  start: "2010-01-01"
+  # end: "2024-01-01"   # defaults to today
+
+momentum:
+  lookback: 200
+  threshold: 0.005
+  use_sma_filter: true
+
+mean_reversion:
+  bb_window: 20
+  bb_std: 2.0
+  rsi_period: 14
+  rsi_oversold: 30.0
+  rsi_overbought: 70.0
+  use_rsi_filter: true
+
+regime:
+  adx_period: 14
+  adx_trending_threshold: 25.0
+  hurst_window: 100
+  smoothing_window: 5
+
+backtest:
+  transaction_cost: 0.001
+  vol_target: 0.15
+  vol_window: 20
+
+risk:
+  enabled: true
+  stop_loss: 0.05
+  take_profit: 0.10
+  trailing_stop: 0.03
+  max_position: 1.0
+  daily_loss_limit: 0.02
+
+walk_forward:
+  enabled: false
+  in_sample_days: 504
+  out_of_sample_days: 126
+
+output:
+  output_dir: results
+  verbose: false
