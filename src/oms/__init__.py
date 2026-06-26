@@ -11,6 +11,7 @@ from src.oms.order import (
     Fill,
     OrderError,
     IllegalOrderTransition,
+    OverFill,
 )
 from src.oms.position import Position
 from src.oms.portfolio import Portfolio
@@ -26,6 +27,7 @@ __all__ = [
     "Fill",
     "OrderError",
     "IllegalOrderTransition",
+    "OverFill",
     "Position",
     "Portfolio",
 ]

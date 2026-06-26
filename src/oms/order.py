@@ -66,6 +66,15 @@ class IllegalOrderTransition(OrderError):
     machine forbids (e.g. filling a cancelled order)."""
 
 
+class OverFill(IllegalOrderTransition, ValueError):
+    """Raised when a fill would push cumulative quantity past the order size.
+
+    Inherits from both :class:`IllegalOrderTransition` (it is an illegal
+    lifecycle event — a fully-filled order is terminal) and ``ValueError``
+    (it is also a bad-quantity argument), so callers can catch it as either.
+    """
+
+
 class Side(str, Enum):
     """Trade side."""
     BUY = "BUY"
@@ -340,11 +349,16 @@ class Order:
             The :class:`Fill` record that was appended.
 
         Raises:
-            IllegalOrderTransition: If the order is already terminal.
+            IllegalOrderTransition: If the order has been cancelled or
+                rejected (a fully-filled order raises ValueError instead,
+                since any further quantity is by definition an over-fill).
             ValueError: On non-positive size/price, over-fill, or an
                 out-of-order timestamp.
         """
-        if self.status.is_terminal:
+        # CANCELLED/REJECTED can never be filled. A FILLED order is also
+        # terminal, but filling it further is a quantity violation, so it
+        # falls through to the over-fill check below for a clearer error.
+        if self.status in (OrderStatus.CANCELLED, OrderStatus.REJECTED):
             raise IllegalOrderTransition(
                 f"order {self.order_id}: cannot fill a {self.status.value} order"
             )
@@ -353,7 +367,7 @@ class Order:
         if fill_price <= 0:
             raise ValueError(f"fill_price must be > 0, got {fill_price}")
         if self.filled_quantity + fill_qty > self.quantity + QTY_EPSILON:
-            raise ValueError(
+            raise OverFill(
                 f"fill of {fill_qty} would over-fill order "
                 f"(filled {self.filled_quantity} of {self.quantity})"
             )
