@@ -52,7 +52,7 @@ The system currently:
 - detects market regimes (trending vs mean-reverting) using ADX and Hurst exponent, or a data-driven Gaussian HMM (Baum-Welch EM + Viterbi, pure numpy)
 - runs **vectorised** backtests with transaction costs, volatility targeting and a risk middleware (stop-loss, take-profit, trailing stop, position limits, daily loss limit)
 - runs **event-driven** backtests through a full OMS — MARKET / LIMIT / STOP / STOP_LIMIT orders, DAY / GTC / IOC / FOK TIF, intrabar limit matching, gap-safe stop fills, partial fills, weighted-avg cost basis, realized vs unrealized PnL splits
-- models realistic execution costs (bid-ask spread + square-root market impact + fixed commission)
+- models realistic execution costs (bid-ask spread + square-root market impact + fixed commission), plus Almgren-Chriss optimal-execution scheduling and participation-rate impact
 - offers position-sizing helpers: fractional Kelly, ATR-based, fixed-fractional, volatility-target, CPPI and drawdown-throttle sizing
 - exposes a `Broker` interface with a `PaperBroker` implementation that shares the same OMS — a clean seam for future IB / Alpaca / Binance adapters
 - computes **25+ performance metrics** including Sharpe, Sortino, Calmar, CAGR, max drawdown, **Value-at-Risk** (historical / parametric), **Conditional VaR**, **Omega ratio**, **Ulcer Index**, **gain-to-pain**, **drawdown duration & recovery time**, **tail ratio**, **downside/upside deviation**, **rolling beta vs benchmark**, **skew / kurtosis**, **tracking error & information ratio**, **Sterling / Burke ratios**
@@ -99,7 +99,8 @@ trading_system/
 │   ├── live/
 │   │   └── broker.py              # Broker interface + PaperBroker implementation
 │   ├── execution/
-│   │   └── slippage.py            # Spread + sqrt-impact execution model
+│   │   ├── slippage.py            # Spread + sqrt-impact execution model
+│   │   └── impact.py              # Participation-rate cost + Almgren-Chriss scheduling
 │   ├── risk/
 │   │   ├── manager.py             # Risk management middleware
 │   │   ├── sizing.py              # Kelly / ATR / fixed-fractional sizing
@@ -500,6 +501,19 @@ bt = apply_execution_costs(bt, ExecutionConfig(spread_bps=5, impact_coeff=0.1))
 ```
 
 This recomputes `transaction_cost`, `strategy_returns` and `equity_curve` in place.
+
+### Optimal execution (Almgren-Chriss)
+
+`src/execution/impact.py` adds the optimal-execution staples used to schedule a large order: `participation_rate_cost` (temporary impact as a power law of size / ADV — the square-root law at `exponent=0.5`) and the Almgren-Chriss liquidation schedule.
+
+```python
+from src.execution.impact import almgren_chriss_cost, almgren_chriss_trajectory
+
+schedule = almgren_chriss_trajectory(total_shares=10_000, n_steps=20, urgency=0.7)
+cost = almgren_chriss_cost(schedule, eta=0.1, gamma=0.001)
+```
+
+Higher `urgency` front-loads trading (less timing risk, more impact); `urgency=0` is plain TWAP, which minimises temporary impact for a given size.
 
 ## Walk-forward validation
 
