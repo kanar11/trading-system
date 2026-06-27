@@ -45,7 +45,7 @@ The system currently:
 - downloads OHLCV data via `yfinance` or local CSV, with a transparent parquet-backed cache (`src.data.cache`)
 - ships pre-defined universes (FAANG, Dow 30, sector ETFs, benchmarks, factor ETFs) in `src.data.universe`
 - aggregates intraday bars to any frequency via `src.data.resample` (1m → 5m → 1h → 1D → 1W → 1ME)
-- maintains a comprehensive technical-indicators library (`src.indicators`): SMA / EMA / WMA / VWMA, RSI, MACD, Stochastic, Williams %R, CCI, ROC, ATR (SMA/EMA/Wilder smoothings), Bollinger, Keltner, Donchian, OBV, anchored VWAP, Chaikin A/D
+- maintains a comprehensive technical-indicators library (`src.indicators`): SMA / EMA / WMA / VWMA, RSI, MACD, Stochastic, Williams %R, CCI, ROC, ATR (SMA/EMA/Wilder smoothings), Bollinger, Keltner, Donchian, OBV, anchored VWAP, Chaikin A/D, Hull MA, Aroon, TRIX, CMO, MFI
 - generates trading signals using seven strategy templates: momentum, mean reversion, Donchian breakout, EMA crossover, MACD, pairs (cointegration), and adaptive (regime-based)
 - combines multiple strategies via majority vote, weighted sum or unanimous-consent ensemble combiners
 - detects market regimes (trending vs mean-reverting) using ADX and Hurst exponent, or a data-driven Gaussian HMM (Baum-Welch EM + Viterbi, pure numpy)
@@ -641,10 +641,10 @@ Core portfolio-level metrics computed from the daily return series:
 
 | Family       | Indicators                                                                       |
 |--------------|----------------------------------------------------------------------------------|
-| Trend        | `sma`, `ema`, `wma`, `vwma`                                                      |
-| Momentum     | `rsi`, `macd`, `stochastic`, `williams_r`, `cci`, `roc`                          |
+| Trend        | `sma`, `ema`, `wma`, `vwma`, `hma`, `aroon`                                      |
+| Momentum     | `rsi`, `macd`, `stochastic`, `williams_r`, `cci`, `roc`, `trix`, `cmo`           |
 | Volatility   | `atr` (sma/ema/wilder), `bollinger`, `keltner`, `donchian`                       |
-| Volume       | `obv`, `vwap` (anchored), `chaikin_ad`                                           |
+| Volume       | `obv`, `vwap` (anchored), `chaikin_ad`, `mfi`                                    |
 
 ```python
 from src.indicators import rsi, bollinger, atr, vwap

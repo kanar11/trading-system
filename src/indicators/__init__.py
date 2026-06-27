@@ -17,10 +17,10 @@ NumPy is used internally where it helps; the public surface is pure
 pandas. Functions are pure (no in-place mutation of inputs).
 """
 
-from src.indicators.momentum import cci, macd, roc, rsi, stochastic, williams_r
-from src.indicators.trend import ema, sma, vwma, wma
+from src.indicators.momentum import cci, cmo, macd, roc, rsi, stochastic, trix, williams_r
+from src.indicators.trend import aroon, ema, hma, sma, vwma, wma
 from src.indicators.volatility import atr, bollinger, donchian, keltner
-from src.indicators.volume import chaikin_ad, obv, vwap
+from src.indicators.volume import chaikin_ad, mfi, obv, vwap
 
 __all__ = [
     # trend
@@ -28,6 +28,8 @@ __all__ = [
     "ema",
     "wma",
     "vwma",
+    "hma",
+    "aroon",
     # momentum
     "rsi",
     "macd",
@@ -35,6 +37,8 @@ __all__ = [
     "williams_r",
     "cci",
     "roc",
+    "trix",
+    "cmo",
     # volatility
     "atr",
     "bollinger",
@@ -44,4 +48,5 @@ __all__ = [
     "obv",
     "vwap",
     "chaikin_ad",
+    "mfi",
 ]

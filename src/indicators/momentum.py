@@ -96,3 +96,30 @@ def roc(close: pd.Series, period: int = 10) -> pd.Series:
     if period <= 0:
         raise ValueError("period must be > 0")
     return 100 * close.pct_change(period)
+
+
+def trix(close: pd.Series, period: int = 15) -> pd.Series:
+    """TRIX — rate of change of a triple-smoothed EMA (percent).
+
+    Oscillates around zero: positive in up-trends, negative in down-trends.
+    """
+    if period <= 0:
+        raise ValueError("period must be > 0")
+    triple = ema(ema(ema(close, period), period), period)
+    return 100 * triple.pct_change()
+
+
+def cmo(close: pd.Series, period: int = 14) -> pd.Series:
+    """Chande Momentum Oscillator, in [-100, 100].
+
+    CMO = 100 * (sum_up - sum_down) / (sum_up + sum_down) over ``period`` bars.
+    """
+    if period <= 0:
+        raise ValueError("period must be > 0")
+    delta = close.diff()
+    up = delta.clip(lower=0.0)
+    down = (-delta).clip(lower=0.0)
+    sum_up = up.rolling(period, min_periods=period).sum()
+    sum_down = down.rolling(period, min_periods=period).sum()
+    denom = (sum_up + sum_down).replace(0, np.nan)
+    return 100 * (sum_up - sum_down) / denom
