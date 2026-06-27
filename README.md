@@ -60,6 +60,7 @@ The system currently:
 - aggregates single-asset strategies into a multi-asset portfolio (equal-weight, inverse-vol, custom, min-variance, max-Sharpe, risk-parity, maximum-diversification, or hierarchical-risk-parity weights)
 - runs factor / attribution regression to separate alpha from passive factor exposure
 - generates multi-panel tear-sheet reports (equity, drawdown, rolling Sharpe, monthly heatmap, distribution, metrics table)
+- tabulates periodic returns — a year x month table with an annual total, per-year returns, and rolling annualised return / volatility / Sharpe (`src.reporting.periodic`)
 - exports trade logs and parameter sweep results
 - ships an end-to-end `examples/full_demo.py` and a GitHub Actions CI workflow
 
@@ -122,7 +123,8 @@ trading_system/
 │       ├── trades.py              # Trade log builder (standalone utility)
 │       ├── sweep.py               # Parameter sweep runner
 │       ├── tearsheet.py           # Multi-panel PNG tear-sheet report
-│       └── attribution.py         # Factor / alpha regression
+│       ├── attribution.py         # Factor / alpha regression
+│       └── periodic.py            # Calendar return tables + rolling metrics
 ├── tests/
 │   ├── conftest.py                # Shared fixtures (OHLCV, returns)
 │   ├── test_metrics.py            # Portfolio + trade-level metric tests
@@ -624,6 +626,20 @@ fig = generate_tearsheet(
 ```
 
 Returns a matplotlib `Figure` and writes a PNG. Headless-friendly — safe to call from CI.
+
+## Periodic return analytics
+
+`src/reporting/periodic.py` tabulates a daily return stream over calendar periods — a useful companion to the tear-sheet:
+
+```python
+from src.reporting.periodic import annual_returns, monthly_returns_table, rolling_metrics
+
+monthly = monthly_returns_table(returns)    # year x month, with an `annual` total column
+yearly = annual_returns(returns)            # one compounded return per calendar year
+roll = rolling_metrics(returns, window=63)  # rolling annualised return / volatility / Sharpe
+```
+
+All three expect a Series indexed by a DatetimeIndex and never mutate the input.
 
 ## Trade-level analytics
 
