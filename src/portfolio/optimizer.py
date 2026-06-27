@@ -21,6 +21,7 @@ No scipy required — pure numpy.
 from __future__ import annotations
 
 import logging
+import math
 
 import numpy as np
 import pandas as pd
@@ -188,3 +189,135 @@ def risk_parity_weights(
 
     w = w / w.sum()
     return pd.Series(w, index=returns.columns, name="risk_parity")
+
+
+def maximum_diversification_weights(
+    returns: pd.DataFrame,
+    cov: pd.DataFrame | np.ndarray | None = None,
+) -> pd.Series:
+    """Long-only most-diversified portfolio (Choueifaty & Coignard, 2008).
+
+    Maximises the diversification ratio ``(wᵀσ) / sqrt(wᵀΣw)``; the
+    unconstrained solution is proportional to ``Σ⁻¹ σ`` (σ = per-asset
+    volatilities). Negative weights are clipped and the vector re-normalised.
+    For uncorrelated assets this reduces to inverse-volatility weighting.
+
+    Args:
+        returns: DataFrame of asset returns (columns = tickers).
+        cov: Optional pre-computed covariance matrix.
+
+    Returns:
+        Series of weights indexed by ticker, summing to 1.
+    """
+    cov_matrix = _covariance_matrix(returns, cov)
+    vols = np.sqrt(np.diag(cov_matrix))
+    try:
+        inv = np.linalg.inv(cov_matrix)
+    except np.linalg.LinAlgError:
+        logger.warning("covariance not invertible; falling back to equal weights")
+        n = cov_matrix.shape[0]
+        return pd.Series(np.full(n, 1.0 / n), index=returns.columns, name="max_diversification")
+
+    raw: np.ndarray = inv @ vols
+    w = _clip_and_normalise(raw)
+    return pd.Series(w, index=returns.columns, name="max_diversification")
+
+
+def _cluster_distance(dist: np.ndarray, left: list[int], right: list[int]) -> float:
+    """Single-linkage distance between two clusters (min pairwise)."""
+    return float(min(dist[i, j] for i in left for j in right))
+
+
+def _single_linkage_order(dist: np.ndarray) -> list[int]:
+    """Agglomerative single-linkage leaf order (quasi-diagonalisation).
+
+    Repeatedly merges the two closest clusters and concatenates their leaf
+    orders, so correlated assets end up adjacent in the returned ordering.
+    """
+    n = dist.shape[0]
+    clusters: dict[int, list[int]] = {i: [i] for i in range(n)}
+    active = list(range(n))
+    next_id = n
+    while len(active) > 1:
+        best = math.inf
+        pair = (active[0], active[1])
+        for ii in range(len(active)):
+            for jj in range(ii + 1, len(active)):
+                a, b = active[ii], active[jj]
+                d = _cluster_distance(dist, clusters[a], clusters[b])
+                if d < best:
+                    best = d
+                    pair = (a, b)
+        a, b = pair
+        clusters[next_id] = clusters[a] + clusters[b]
+        active.remove(a)
+        active.remove(b)
+        active.append(next_id)
+        del clusters[a], clusters[b]
+        next_id += 1
+    return clusters[active[0]]
+
+
+def _cluster_variance(cov: np.ndarray, items: list[int]) -> float:
+    """Inverse-variance-weighted variance of a sub-portfolio."""
+    sub = cov[np.ix_(items, items)]
+    ivp = 1.0 / np.diag(sub)
+    ivp = ivp / ivp.sum()
+    return float(ivp @ sub @ ivp)
+
+
+def _recursive_bisection(cov: np.ndarray, order: list[int]) -> np.ndarray:
+    """Allocate weights down the dendrogram by inverse-cluster-variance splits."""
+    w = np.ones(cov.shape[0])
+    clusters: list[list[int]] = [order]
+    while clusters:
+        nxt: list[list[int]] = []
+        for cluster in clusters:
+            if len(cluster) <= 1:
+                continue
+            mid = len(cluster) // 2
+            left, right = cluster[:mid], cluster[mid:]
+            var_left = _cluster_variance(cov, left)
+            var_right = _cluster_variance(cov, right)
+            alpha = 1.0 - var_left / (var_left + var_right)
+            for i in left:
+                w[i] *= alpha
+            for i in right:
+                w[i] *= 1.0 - alpha
+            nxt.append(left)
+            nxt.append(right)
+        clusters = nxt
+    return w
+
+
+def hierarchical_risk_parity_weights(
+    returns: pd.DataFrame,
+    cov: pd.DataFrame | np.ndarray | None = None,
+) -> pd.Series:
+    """Hierarchical Risk Parity weights (López de Prado, 2016).
+
+    Three stages, all pure numpy: (1) tree clustering of assets by a
+    correlation distance ``sqrt(0.5 * (1 - corr))`` via single linkage;
+    (2) quasi-diagonalisation — reorder assets so similar ones are adjacent;
+    (3) recursive bisection — split the ordered list and allocate between the
+    halves by inverse cluster variance. Long-only by construction.
+
+    Args:
+        returns: DataFrame of asset returns (columns = tickers).
+        cov: Optional pre-computed covariance matrix.
+
+    Returns:
+        Series of weights indexed by ticker, summing to 1.
+    """
+    cov_matrix = _covariance_matrix(returns, cov)
+    n = cov_matrix.shape[0]
+    if n == 1:
+        return pd.Series([1.0], index=returns.columns, name="hrp")
+
+    vols = np.sqrt(np.diag(cov_matrix))
+    corr = np.clip(cov_matrix / np.outer(vols, vols), -1.0, 1.0)
+    dist = np.sqrt(0.5 * (1.0 - corr))
+
+    order = _single_linkage_order(dist)
+    w = _recursive_bisection(cov_matrix, order)
+    return pd.Series(w, index=returns.columns, name="hrp")

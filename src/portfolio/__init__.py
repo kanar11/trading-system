@@ -1,7 +1,9 @@
 """Multi-asset portfolio backtest and weight optimisation."""
 
 from src.portfolio.optimizer import (
+    hierarchical_risk_parity_weights,
     max_sharpe_weights,
+    maximum_diversification_weights,
     min_variance_weights,
     risk_parity_weights,
 )
@@ -18,4 +20,6 @@ __all__ = [
     "min_variance_weights",
     "max_sharpe_weights",
     "risk_parity_weights",
+    "maximum_diversification_weights",
+    "hierarchical_risk_parity_weights",
 ]

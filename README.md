@@ -56,7 +56,7 @@ The system currently:
 - exposes a `Broker` interface with a `PaperBroker` implementation that shares the same OMS — a clean seam for future IB / Alpaca / Binance adapters
 - computes **25+ performance metrics** including Sharpe, Sortino, Calmar, CAGR, max drawdown, **Value-at-Risk** (historical / parametric), **Conditional VaR**, **Omega ratio**, **Ulcer Index**, **gain-to-pain**, **drawdown duration & recovery time**, **tail ratio**, **downside/upside deviation**, **rolling beta vs benchmark**, **skew / kurtosis**, **tracking error & information ratio**, **Sterling / Burke ratios**
 - runs walk-forward validation, Monte Carlo bootstrap, trade-shuffle robustness and statistical Sharpe significance tests (t-test, Probabilistic SR, **Deflated SR** for multiple-testing correction), plus a CSCV **Probability of Backtest Overfitting** estimate
-- aggregates single-asset strategies into a multi-asset portfolio (equal-weight, inverse-vol, custom, min-variance, max-Sharpe, or risk-parity weights via Maillard-Roncalli-Teïletche cyclical descent)
+- aggregates single-asset strategies into a multi-asset portfolio (equal-weight, inverse-vol, custom, min-variance, max-Sharpe, risk-parity, maximum-diversification, or hierarchical-risk-parity weights)
 - runs factor / attribution regression to separate alpha from passive factor exposure
 - generates multi-panel tear-sheet reports (equity, drawdown, rolling Sharpe, monthly heatmap, distribution, metrics table)
 - exports trade logs and parameter sweep results
@@ -550,13 +550,15 @@ The series is split into `n_blocks` equal blocks; every choice of half the block
 - **`inverse_vol`** — weights inversely proportional to trailing realised volatility (simple risk-parity proxy).
 - **`custom`** — user-supplied static weights, normalised to sum to 1.
 
-For covariance-aware allocation, `src/portfolio/optimizer.py` provides three closed-form / iterative schemes (no scipy required):
+For covariance-aware allocation, `src/portfolio/optimizer.py` provides five closed-form / iterative schemes (no scipy required):
 
 - **`min_variance_weights(returns, cov=None)`** — long-only minimum-variance portfolio via `Σ⁻¹ 1`.
 - **`max_sharpe_weights(returns, cov=None, rf_daily=0)`** — long-only tangency portfolio via `Σ⁻¹ (μ − rf)`.
 - **`risk_parity_weights(returns, cov=None)`** — true equal risk-contribution weights via cyclical coordinate descent (Maillard, Roncalli & Teïletche 2010).
+- **`maximum_diversification_weights(returns, cov=None)`** — most-diversified portfolio via `Σ⁻¹ σ` (Choueifaty & Coignard 2008); reduces to inverse-vol for uncorrelated assets.
+- **`hierarchical_risk_parity_weights(returns, cov=None)`** — HRP: correlation-distance clustering → quasi-diagonalisation → recursive bisection (López de Prado 2016).
 
-All optimisers clip negative weights to zero and re-normalise.
+The closed-form optimisers clip negative weights to zero and re-normalise; HRP is long-only by construction.
 
 ```python
 from src.portfolio import PortfolioConfig, run_portfolio_backtest
