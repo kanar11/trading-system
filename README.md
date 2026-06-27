@@ -55,7 +55,7 @@ The system currently:
 - offers position-sizing helpers: fractional Kelly, ATR-based and fixed-fractional sizing
 - exposes a `Broker` interface with a `PaperBroker` implementation that shares the same OMS — a clean seam for future IB / Alpaca / Binance adapters
 - computes **20+ performance metrics** including Sharpe, Sortino, Calmar, CAGR, max drawdown, **Value-at-Risk** (historical / parametric), **Conditional VaR**, **Omega ratio**, **Ulcer Index**, **gain-to-pain**, **drawdown duration & recovery time**, **tail ratio**, **downside/upside deviation**, **rolling beta vs benchmark**
-- runs walk-forward validation, Monte Carlo bootstrap, trade-shuffle robustness and statistical Sharpe significance tests (t-test, Probabilistic SR, **Deflated SR** for multiple-testing correction)
+- runs walk-forward validation, Monte Carlo bootstrap, trade-shuffle robustness and statistical Sharpe significance tests (t-test, Probabilistic SR, **Deflated SR** for multiple-testing correction), plus a CSCV **Probability of Backtest Overfitting** estimate
 - aggregates single-asset strategies into a multi-asset portfolio (equal-weight, inverse-vol, custom, min-variance, max-Sharpe, or risk-parity weights via Maillard-Roncalli-Teïletche cyclical descent)
 - runs factor / attribution regression to separate alpha from passive factor exposure
 - generates multi-panel tear-sheet reports (equity, drawdown, rolling Sharpe, monthly heatmap, distribution, metrics table)
@@ -107,7 +107,8 @@ trading_system/
 │   ├── validation/
 │   │   ├── walk_forward.py        # Walk-forward validation framework
 │   │   ├── monte_carlo.py         # Bootstrap + trade-shuffle robustness
-│   │   └── stat_tests.py          # Sharpe t-test, Probabilistic & Deflated SR
+│   │   ├── stat_tests.py          # Sharpe t-test, Probabilistic & Deflated SR
+│   │   └── pbo.py                 # Probability of Backtest Overfitting (CSCV)
 │   ├── portfolio/
 │   │   ├── portfolio.py           # Multi-asset portfolio backtest
 │   │   └── optimizer.py           # Min-variance / max-Sharpe / risk-parity weights
@@ -512,6 +513,20 @@ Both return a `MonteCarloResult` with per-simulation metrics and a mean / std / 
 - **`deflated_sharpe_ratio(returns, n_trials)`** — same idea but inflates the target Sharpe to account for the *best of N* parameter trials. The right answer to "I tried 200 parameter combinations and the best one looks great — is that real?" is almost never the raw PSR.
 
 Both PSR and DSR are pure-Python (no scipy): they use the standard-library `math.erf` for the normal CDF and an Acklam-2003 rational approximation for its inverse.
+
+## Probability of backtest overfitting (PBO)
+
+When you grid-search hundreds of parameter combinations, the best in-sample config is often just the luckiest. `src/validation/pbo.py` quantifies that risk with **combinatorially-symmetric cross-validation** (Bailey, Borwein, López de Prado & Zhu, 2017):
+
+```python
+from src.validation import probability_of_backtest_overfitting
+
+# returns_matrix: (T observations, N candidate configs)
+result = probability_of_backtest_overfitting(returns_matrix, n_blocks=10)
+print(result.pbo)   # ~0 generalises · ~0.5 no real edge · ~1 systematic overfit
+```
+
+The series is split into `n_blocks` equal blocks; every choice of half the blocks as in-sample (with the complement out-of-sample) is evaluated. For each split the in-sample-best config's out-of-sample rank is mapped to a logit, and PBO is the fraction of splits where it lands in the bottom half. Pure numpy.
 
 ## Multi-asset portfolio
 
