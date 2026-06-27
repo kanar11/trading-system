@@ -52,7 +52,7 @@ The system currently:
 - runs **vectorised** backtests with transaction costs, volatility targeting and a risk middleware (stop-loss, take-profit, trailing stop, position limits, daily loss limit)
 - runs **event-driven** backtests through a full OMS — MARKET / LIMIT / STOP / STOP_LIMIT orders, DAY / GTC / IOC / FOK TIF, intrabar limit matching, gap-safe stop fills, partial fills, weighted-avg cost basis, realized vs unrealized PnL splits
 - models realistic execution costs (bid-ask spread + square-root market impact + fixed commission)
-- offers position-sizing helpers: fractional Kelly, ATR-based and fixed-fractional sizing
+- offers position-sizing helpers: fractional Kelly, ATR-based, fixed-fractional, volatility-target, CPPI and drawdown-throttle sizing
 - exposes a `Broker` interface with a `PaperBroker` implementation that shares the same OMS — a clean seam for future IB / Alpaca / Binance adapters
 - computes **25+ performance metrics** including Sharpe, Sortino, Calmar, CAGR, max drawdown, **Value-at-Risk** (historical / parametric), **Conditional VaR**, **Omega ratio**, **Ulcer Index**, **gain-to-pain**, **drawdown duration & recovery time**, **tail ratio**, **downside/upside deviation**, **rolling beta vs benchmark**, **skew / kurtosis**, **tracking error & information ratio**, **Sterling / Burke ratios**
 - runs walk-forward validation, Monte Carlo bootstrap, trade-shuffle robustness and statistical Sharpe significance tests (t-test, Probabilistic SR, **Deflated SR** for multiple-testing correction), plus a CSCV **Probability of Backtest Overfitting** estimate
@@ -384,11 +384,14 @@ CLI flags: `--stop-loss`, `--take-profit`, `--trailing-stop`, `--max-position`, 
 
 ## Position sizing
 
-`src/risk/sizing.py` provides three independent sizing helpers that can be used at calibration time (fit on IS, apply on OOS) or as post-hoc studies:
+`src/risk/sizing.py` provides six independent sizing helpers that can be used at calibration time (fit on IS, apply on OOS) or as post-hoc studies:
 
 - **`kelly_fraction(returns, cap, kelly_fraction_of_full)`** — continuous Kelly `f* = mean / variance`. Half-Kelly is the default to control variance.
 - **`atr_position_size(price, atr, equity, risk_per_trade, atr_multiple, max_size)`** — sets notional so that hitting an `N * ATR` stop costs exactly `risk_per_trade` of equity.
 - **`fixed_fractional(win_rate, payoff_ratio, cap)`** — discrete-outcome Kelly from trade-log stats: `f* = W - (1 - W) / R`.
+- **`volatility_target_size(realized_vol, target_vol, max_size)`** — scale exposure so realised vol matches a target (`target / realized`).
+- **`cppi_fraction(equity, floor, multiplier, max_size)`** — CPPI risky exposure on the cushion above a protective floor; de-risks automatically toward the floor.
+- **`drawdown_throttle(current_drawdown, max_drawdown, max_size)`** — linearly cut exposure as the drawdown approaches a tolerated cap.
 
 All helpers return a position fraction in `[0, cap]` and degrade gracefully (return `0.0`) when the edge is non-positive.
 

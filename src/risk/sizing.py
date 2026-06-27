@@ -6,10 +6,13 @@ independent of the backtest engine so they can be used at calibration
 time (e.g. fit a Kelly fraction on in-sample data, apply it on OOS) or
 as a post-hoc study against an existing trade log.
 
-Three sizing styles are provided:
-    - kelly_fraction:        Edge / variance based fractional Kelly.
-    - atr_position_size:     Cap notional so loss-per-stop = risk budget.
-    - fixed_fractional:      Risk a fixed fraction of equity per trade.
+Sizing styles provided:
+    - kelly_fraction:         Edge / variance based fractional Kelly.
+    - atr_position_size:      Cap notional so loss-per-stop = risk budget.
+    - fixed_fractional:       Risk a fixed fraction of equity per trade.
+    - volatility_target_size: Scale exposure toward a target volatility.
+    - cppi_fraction:          CPPI risky exposure above a protective floor.
+    - drawdown_throttle:      De-risk as drawdown approaches a tolerated cap.
 """
 
 from __future__ import annotations
@@ -121,3 +124,81 @@ def fixed_fractional(
 
     f = win_rate - (1 - win_rate) / payoff_ratio
     return float(np.clip(f, 0.0, cap))
+
+
+def volatility_target_size(
+    realized_vol: float,
+    target_vol: float = 0.15,
+    max_size: float = 1.0,
+) -> float:
+    """Scale exposure so realised volatility matches a target.
+
+    fraction = target_vol / realized_vol, clamped to [0, max_size]. A more
+    volatile asset gets a smaller position. Returns 0.0 when either volatility
+    is non-positive (no usable risk estimate).
+
+    Args:
+        realized_vol: Estimated (annualised) volatility of the asset/strategy.
+        target_vol: Desired portfolio volatility (same units as realized_vol).
+        max_size: Hard cap on the returned size (limits leverage).
+
+    Returns:
+        Position size in [0, max_size].
+    """
+    if realized_vol <= 0 or target_vol <= 0:
+        return 0.0
+    return float(min(target_vol / realized_vol, max_size))
+
+
+def cppi_fraction(
+    equity: float,
+    floor: float,
+    multiplier: float = 3.0,
+    max_size: float = 1.0,
+) -> float:
+    """Constant Proportion Portfolio Insurance risky-asset exposure.
+
+    exposure = multiplier * (equity - floor) / equity, clamped to
+    [0, max_size]. As equity falls toward the protective ``floor`` the cushion
+    shrinks and exposure de-risks automatically; at or below the floor it is 0.
+
+    Args:
+        equity: Current account equity.
+        floor: Protective floor below which no risk is taken.
+        multiplier: CPPI multiplier on the cushion (equity - floor).
+        max_size: Hard cap on the returned size.
+
+    Returns:
+        Risky-asset fraction in [0, max_size].
+    """
+    if equity <= 0 or multiplier <= 0:
+        return 0.0
+    cushion = equity - floor
+    if cushion <= 0:
+        return 0.0
+    return float(min(multiplier * cushion / equity, max_size))
+
+
+def drawdown_throttle(
+    current_drawdown: float,
+    max_drawdown: float,
+    max_size: float = 1.0,
+) -> float:
+    """Linearly de-risk as the current drawdown approaches a tolerated max.
+
+    size = max_size * (1 - |current_drawdown| / max_drawdown), clamped to
+    [0, max_size]. At zero drawdown returns ``max_size``; at or beyond
+    ``max_drawdown`` returns 0.
+
+    Args:
+        current_drawdown: Current drawdown (sign-insensitive; e.g. -0.08 or 0.08).
+        max_drawdown: Maximum tolerated drawdown magnitude (> 0).
+        max_size: Exposure at zero drawdown.
+
+    Returns:
+        Throttled position size in [0, max_size].
+    """
+    if max_drawdown <= 0:
+        return 0.0
+    scale = 1.0 - abs(current_drawdown) / max_drawdown
+    return float(np.clip(scale, 0.0, 1.0) * max_size)
