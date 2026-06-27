@@ -45,6 +45,7 @@ The system currently:
 - downloads OHLCV data via `yfinance` or local CSV, with a transparent parquet-backed cache (`src.data.cache`)
 - ships pre-defined universes (FAANG, Dow 30, sector ETFs, benchmarks, factor ETFs) in `src.data.universe`
 - aggregates intraday bars to any frequency via `src.data.resample` (1m → 5m → 1h → 1D → 1W → 1ME)
+- audits OHLCV data quality — duplicate timestamps, unsorted index, missing values, OHLC inconsistencies, extreme returns, stale-price runs — and conservatively cleans it (`src.data.quality`)
 - maintains a comprehensive technical-indicators library (`src.indicators`): SMA / EMA / WMA / VWMA, RSI, MACD, Stochastic, Williams %R, CCI, ROC, ATR (SMA/EMA/Wilder smoothings), Bollinger, Keltner, Donchian, OBV, anchored VWAP, Chaikin A/D, Hull MA, Aroon, TRIX, CMO, MFI
 - generates trading signals using eight strategy templates: momentum, mean reversion, Donchian breakout, EMA crossover, MACD, TRIX, pairs (cointegration), and adaptive (regime-based)
 - combines multiple strategies via majority vote, weighted sum or unanimous-consent ensemble combiners
@@ -72,7 +73,8 @@ trading_system/
 │   │   ├── csv_loader.py          # Local CSV OHLCV loader (offline / custom data)
 │   │   ├── cache.py               # Parquet-backed loader cache
 │   │   ├── resample.py            # OHLCV bar aggregation (1m -> 1D, etc.)
-│   │   └── universe.py            # FAANG / Dow30 / sectors / benchmarks / factors
+│   │   ├── universe.py            # FAANG / Dow30 / sectors / benchmarks / factors
+│   │   └── quality.py             # OHLCV data-quality auditor + cleaner
 │   ├── indicators/                # Comprehensive vectorised TA library
 │   │   ├── trend.py               # SMA / EMA / WMA / VWMA
 │   │   ├── momentum.py            # RSI / MACD / Stochastic / Williams %R / CCI / ROC
@@ -680,6 +682,16 @@ vw = vwap(df["close"], df["volume"], anchor="D")
 - **`CachedLoader`** — drop-in wrapper that persists downloaded frames to `~/.trading_system_cache/` (parquet preferred, CSV fallback) so repeat backtests don't hit the network.
 - **`resample_ohlcv` / `to_daily` / `to_weekly` / `to_monthly`** — aggregate intraday bars (open=first, high=max, low=min, close=last, volume=sum).
 - **`get_universe(name)`** — pre-defined baskets: `faang`, `faang_plus`, `dow30`, `sectors`, `benchmarks`, `factors`.
+- **`check_ohlcv(df)` / `clean_ohlcv(df)`** — audit a frame for duplicates, gaps, OHLC inconsistencies, extreme returns and stale prices (returns a `DataQualityReport`), then drop the untrustworthy rows.
+
+```python
+from src.data.quality import check_ohlcv, clean_ohlcv
+
+report = check_ohlcv(df)
+if not report.is_clean:
+    print(report.issues)
+    df = clean_ohlcv(df)
+```
 
 ```python
 from src.data import load_yahoo_ohlcv
