@@ -46,7 +46,7 @@ The system currently:
 - ships pre-defined universes (FAANG, Dow 30, sector ETFs, benchmarks, factor ETFs) in `src.data.universe`
 - aggregates intraday bars to any frequency via `src.data.resample` (1m → 5m → 1h → 1D → 1W → 1ME)
 - maintains a comprehensive technical-indicators library (`src.indicators`): SMA / EMA / WMA / VWMA, RSI, MACD, Stochastic, Williams %R, CCI, ROC, ATR (SMA/EMA/Wilder smoothings), Bollinger, Keltner, Donchian, OBV, anchored VWAP, Chaikin A/D, Hull MA, Aroon, TRIX, CMO, MFI
-- generates trading signals using seven strategy templates: momentum, mean reversion, Donchian breakout, EMA crossover, MACD, pairs (cointegration), and adaptive (regime-based)
+- generates trading signals using eight strategy templates: momentum, mean reversion, Donchian breakout, EMA crossover, MACD, TRIX, pairs (cointegration), and adaptive (regime-based)
 - combines multiple strategies via majority vote, weighted sum or unanimous-consent ensemble combiners
 - detects market regimes (trending vs mean-reverting) using ADX and Hurst exponent, or a data-driven Gaussian HMM (Baum-Welch EM + Viterbi, pure numpy)
 - runs **vectorised** backtests with transaction costs, volatility targeting and a risk middleware (stop-loss, take-profit, trailing stop, position limits, daily loss limit)
@@ -84,6 +84,7 @@ trading_system/
 │   │   ├── mean_reversion.py      # Bollinger Bands + RSI strategy
 │   │   ├── breakout.py            # Donchian channel breakout (turtle-style)
 │   │   ├── ema_crossover.py       # Fast/slow EMA and MACD crossover signals
+│   │   ├── trix.py                # TRIX triple-EMA trend-following strategy
 │   │   ├── pairs.py               # Cointegration-based pairs trading
 │   │   └── ensemble.py            # Majority / weighted / unanimous combiners
 │   ├── backtest/
@@ -314,6 +315,16 @@ Two classical trend-following baselines sharing the same EMA primitive. The EMA 
 ```bash
 python main.py --strategy ema-cross --ema-fast 20 --ema-slow 100 --ema-gap-bps 10
 python main.py --strategy macd --macd-fast 12 --macd-slow 26 --macd-signal 9
+```
+
+### TRIX (triple-EMA trend)
+
+TRIX is the rate of change of a triple-smoothed EMA — a low-noise trend oscillator. The strategy holds long while TRIX is positive and short while it is negative; `use_signal_line=True` switches the threshold to an EMA of TRIX for earlier crossover entries. Reuses the shared `trix` primitive from `src.indicators`.
+
+```python
+from src.strategy.trix import trix_strategy
+
+signals = trix_strategy(df, period=15, use_signal_line=False, allow_short=True)
 ```
 
 ### Pairs trading (cointegration)
