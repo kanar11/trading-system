@@ -54,7 +54,7 @@ The system currently:
 - models realistic execution costs (bid-ask spread + square-root market impact + fixed commission)
 - offers position-sizing helpers: fractional Kelly, ATR-based and fixed-fractional sizing
 - exposes a `Broker` interface with a `PaperBroker` implementation that shares the same OMS — a clean seam for future IB / Alpaca / Binance adapters
-- computes **20+ performance metrics** including Sharpe, Sortino, Calmar, CAGR, max drawdown, **Value-at-Risk** (historical / parametric), **Conditional VaR**, **Omega ratio**, **Ulcer Index**, **gain-to-pain**, **drawdown duration & recovery time**, **tail ratio**, **downside/upside deviation**, **rolling beta vs benchmark**
+- computes **25+ performance metrics** including Sharpe, Sortino, Calmar, CAGR, max drawdown, **Value-at-Risk** (historical / parametric), **Conditional VaR**, **Omega ratio**, **Ulcer Index**, **gain-to-pain**, **drawdown duration & recovery time**, **tail ratio**, **downside/upside deviation**, **rolling beta vs benchmark**, **skew / kurtosis**, **tracking error & information ratio**, **Sterling / Burke ratios**
 - runs walk-forward validation, Monte Carlo bootstrap, trade-shuffle robustness and statistical Sharpe significance tests (t-test, Probabilistic SR, **Deflated SR** for multiple-testing correction), plus a CSCV **Probability of Backtest Overfitting** estimate
 - aggregates single-asset strategies into a multi-asset portfolio (equal-weight, inverse-vol, custom, min-variance, max-Sharpe, or risk-parity weights via Maillard-Roncalli-Teïletche cyclical descent)
 - runs factor / attribution regression to separate alpha from passive factor exposure
@@ -634,6 +634,9 @@ Core portfolio-level metrics computed from the daily return series:
 - **`tail_ratio(returns, level)`** — right-tail / left-tail magnitude ratio.
 - **`common_ratio(returns)`** — CAGR / annualised vol (compound-return Sharpe variant).
 - **`rolling_beta(strategy, benchmark, window)`** — time-varying beta vs a benchmark.
+- **`skewness` / `kurtosis`** — distribution shape (excess kurtosis; > 0 = fat tails).
+- **`tracking_error` / `information_ratio`** — annualised active risk vs a benchmark and the risk-adjusted out-performance per unit of it.
+- **`sterling_ratio` / `burke_ratio`** — annualised return per unit of average drawdown / root-sum-square of drawdowns.
 
 ## Indicators library
 

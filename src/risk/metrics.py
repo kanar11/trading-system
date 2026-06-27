@@ -272,3 +272,111 @@ def rolling_beta(
     cov = df["s"].rolling(window).cov(df["b"])
     var = df["b"].rolling(window).var()
     return (cov / var.replace(0, np.nan)).rename("beta")
+
+
+# ---------------------------------------------------------------------------
+# Distribution shape & benchmark-relative / drawdown-adjusted ratios
+# ---------------------------------------------------------------------------
+
+
+def _annualized_return(r: pd.Series) -> float:
+    """Geometric annualised return of a daily return series."""
+    years = len(r) / TRADING_DAYS
+    if years <= 0:
+        return 0.0
+    total_growth = float((1.0 + r).to_numpy().prod())
+    if total_growth <= 0:
+        return -1.0
+    return float(total_growth ** (1 / years) - 1)
+
+
+def skewness(returns: pd.Series) -> float:
+    """Sample skewness of the return distribution (0 = symmetric)."""
+    r = pd.Series(returns).dropna()
+    if len(r) < 3:
+        return 0.0
+    mean = float(r.mean())
+    std = float(r.std(ddof=0))
+    if std == 0:
+        return 0.0
+    return float((((r - mean) / std) ** 3).mean())
+
+
+def kurtosis(returns: pd.Series) -> float:
+    """Excess kurtosis (0 = Gaussian; > 0 = heavy tails / fat outliers)."""
+    r = pd.Series(returns).dropna()
+    if len(r) < 4:
+        return 0.0
+    mean = float(r.mean())
+    std = float(r.std(ddof=0))
+    if std == 0:
+        return 0.0
+    return float((((r - mean) / std) ** 4).mean() - 3.0)
+
+
+def tracking_error(
+    returns: pd.Series,
+    benchmark: pd.Series,
+    periods_per_year: int = TRADING_DAYS,
+) -> float:
+    """Annualised standard deviation of the active (returns - benchmark) series."""
+    df = pd.concat([returns.rename("r"), benchmark.rename("b")], axis=1, join="inner").dropna()
+    if len(df) < 2:
+        return 0.0
+    active = df["r"] - df["b"]
+    return float(active.std(ddof=1) * math.sqrt(periods_per_year))
+
+
+def information_ratio(
+    returns: pd.Series,
+    benchmark: pd.Series,
+    periods_per_year: int = TRADING_DAYS,
+) -> float:
+    """Annualised active return divided by tracking error.
+
+    Measures risk-adjusted out-performance versus a benchmark. Returns 0 when
+    the active series has no variability (degenerate tracking error).
+    """
+    df = pd.concat([returns.rename("r"), benchmark.rename("b")], axis=1, join="inner").dropna()
+    if len(df) < 2:
+        return 0.0
+    active = df["r"] - df["b"]
+    te = float(active.std(ddof=1))
+    if te == 0:
+        return 0.0
+    return float(active.mean() / te * math.sqrt(periods_per_year))
+
+
+def sterling_ratio(returns: pd.Series) -> float:
+    """Annualised return divided by the average drawdown magnitude.
+
+    Returns +inf when the equity curve never draws down but is profitable.
+    """
+    r = pd.Series(returns).dropna()
+    if r.empty:
+        return 0.0
+    equity = (1 + r).cumprod()
+    dd = equity / equity.cummax() - 1
+    avg_dd = float(-dd[dd < 0].mean()) if bool((dd < 0).any()) else 0.0
+    ann = _annualized_return(r)
+    if avg_dd == 0:
+        return float("inf") if ann > 0 else 0.0
+    return float(ann / avg_dd)
+
+
+def burke_ratio(returns: pd.Series) -> float:
+    """Annualised return divided by the root-sum-square of drawdowns.
+
+    Penalises a few deep drawdowns more than many shallow ones. Returns +inf
+    when the equity curve never draws down but is profitable.
+    """
+    r = pd.Series(returns).dropna()
+    if r.empty:
+        return 0.0
+    equity = (1 + r).cumprod()
+    dd = equity / equity.cummax() - 1
+    rss = float(np.sqrt((dd**2).sum()))
+    ann = _annualized_return(r)
+    if rss == 0:
+        return float("inf") if ann > 0 else 0.0
+    return float(ann / rss)
