@@ -52,6 +52,7 @@ The system currently:
 - combines multiple strategies via majority vote, weighted sum or unanimous-consent ensemble combiners
 - detects market regimes (trending vs mean-reverting) using ADX and Hurst exponent, or a data-driven Gaussian HMM (Baum-Welch EM + Viterbi, pure numpy)
 - runs **vectorised** backtests with transaction costs, volatility targeting and a risk middleware (stop-loss, take-profit, trailing stop, position limits, daily loss limit)
+- summarises the strategy's position path — time in market, average long/short exposure, turnover and trade count (`src.backtest.summarize_exposure`)
 - runs **event-driven** backtests through a full OMS — MARKET / LIMIT / STOP / STOP_LIMIT orders, DAY / GTC / IOC / FOK TIF, intrabar limit matching, gap-safe stop fills, partial fills, weighted-avg cost basis, realized vs unrealized PnL splits
 - models realistic execution costs (bid-ask spread + square-root market impact + fixed commission), plus Almgren-Chriss optimal-execution scheduling and participation-rate impact
 - offers position-sizing helpers: fractional Kelly, ATR-based, fixed-fractional, volatility-target, CPPI and drawdown-throttle sizing
@@ -96,7 +97,8 @@ trading_system/
 │   │   └── ensemble.py            # Majority / weighted / unanimous combiners
 │   ├── backtest/
 │   │   ├── engine.py              # Vectorised cost-aware backtest engine
-│   │   └── event_engine.py        # Event-driven engine with full OMS
+│   │   ├── event_engine.py        # Event-driven engine with full OMS
+│   │   └── exposure.py            # Position-path exposure / turnover summary
 │   ├── oms/                       # Order Management System
 │   │   ├── order.py               # Order / OrderStatus / OrderType / Side / TIF
 │   │   ├── position.py            # Per-symbol position with cost basis + PnL
