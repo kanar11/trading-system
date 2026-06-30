@@ -10,6 +10,11 @@ from src.execution.slippage import (
     apply_execution_costs,
     compute_execution_cost,
 )
+from src.execution.tca import (
+    execution_vwap,
+    implementation_shortfall,
+    vwap_slippage,
+)
 
 __all__ = [
     "ExecutionConfig",
@@ -18,4 +23,7 @@ __all__ = [
     "participation_rate_cost",
     "almgren_chriss_trajectory",
     "almgren_chriss_cost",
+    "execution_vwap",
+    "implementation_shortfall",
+    "vwap_slippage",
 ]

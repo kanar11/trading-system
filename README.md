@@ -55,6 +55,7 @@ The system currently:
 - summarises the strategy's position path — time in market, average long/short exposure, turnover and trade count (`src.backtest.summarize_exposure`)
 - runs **event-driven** backtests through a full OMS — MARKET / LIMIT / STOP / STOP_LIMIT orders, DAY / GTC / IOC / FOK TIF, intrabar limit matching, gap-safe stop fills, partial fills, weighted-avg cost basis, realized vs unrealized PnL splits
 - models realistic execution costs (bid-ask spread + square-root market impact + fixed commission), plus Almgren-Chriss optimal-execution scheduling and participation-rate impact
+- runs post-trade transaction-cost analysis — implementation shortfall vs arrival price and VWAP slippage (`src.execution.tca`)
 - offers position-sizing helpers: fractional Kelly, ATR-based, fixed-fractional, volatility-target, CPPI and drawdown-throttle sizing
 - exposes a `Broker` interface with a `PaperBroker` implementation that shares the same OMS — a clean seam for future IB / Alpaca / Binance adapters
 - reports portfolio exposure analytics — gross/net/long/short exposure, leverage and a Herfindahl concentration index — from the OMS (`src.oms.portfolio_exposure`)
@@ -110,7 +111,8 @@ trading_system/
 │   │   └── broker.py              # Broker interface + PaperBroker implementation
 │   ├── execution/
 │   │   ├── slippage.py            # Spread + sqrt-impact execution model
-│   │   └── impact.py              # Participation-rate cost + Almgren-Chriss scheduling
+│   │   ├── impact.py              # Participation-rate cost + Almgren-Chriss scheduling
+│   │   └── tca.py                 # Post-trade TCA (implementation shortfall, VWAP slip)
 │   ├── risk/
 │   │   ├── manager.py             # Risk management middleware
 │   │   ├── sizing.py              # Kelly / ATR / fixed-fractional sizing
@@ -560,6 +562,19 @@ cost = almgren_chriss_cost(schedule, eta=0.1, gamma=0.001)
 ```
 
 Higher `urgency` front-loads trading (less timing risk, more impact); `urgency=0` is plain TWAP, which minimises temporary impact for a given size.
+
+### Transaction-cost analysis (TCA)
+
+`src/execution/tca.py` scores realised fills against the usual post-trade benchmarks — the arrival (decision) price and a market VWAP:
+
+```python
+from src.execution.tca import implementation_shortfall, vwap_slippage
+
+is_cost = implementation_shortfall(fill_prices, fill_qty, arrival_price=412.5, side="buy")
+slip = vwap_slippage(fill_prices, fill_qty, benchmark_vwap=413.1, side="buy")
+```
+
+Costs are signed fractions of the benchmark: positive = worse than the benchmark, negative = price improvement.
 
 ## Walk-forward validation
 
