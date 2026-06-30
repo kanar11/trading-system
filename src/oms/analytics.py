@@ -1,16 +1,18 @@
-"""Portfolio exposure and concentration analytics.
+"""Portfolio exposure, concentration, and fill analytics.
 
-Read-only summaries computed from a :class:`~src.oms.portfolio.Portfolio` and a
-set of mark prices: gross/net/long/short exposure, leverage, and a Herfindahl
-concentration index. Useful for a risk dashboard or a post-bar snapshot. The
-portfolio is never mutated.
+Read-only summaries over OMS objects: portfolio exposure (gross/net/long/short,
+leverage, Herfindahl concentration) from a :class:`~src.oms.portfolio.Portfolio`
+and mark prices, plus a per-order fill summary (VWAP, maker/taker mix, fill
+duration) over a sequence of :class:`~src.oms.order.Fill`. Inputs are never
+mutated.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from src.oms.order import Fill, Liquidity
 from src.oms.portfolio import Portfolio
 
 
@@ -89,4 +91,50 @@ def portfolio_exposure(portfolio: Portfolio, marks: Mapping[str, float]) -> Expo
         leverage=leverage,
         concentration_hhi=concentration_hhi,
         largest_weight=largest_weight,
+    )
+
+
+@dataclass
+class FillSummary:
+    """Execution summary over a sequence of fills.
+
+    Attributes:
+        n_fills: Number of fills.
+        total_quantity: Sum of fill quantities.
+        vwap: Quantity-weighted average fill price.
+        maker_fraction: Fraction of filled quantity executed as MAKER liquidity.
+        duration_seconds: Wall-clock span from the first to the last fill.
+    """
+
+    n_fills: int
+    total_quantity: float
+    vwap: float
+    maker_fraction: float
+    duration_seconds: float
+
+
+def summarize_fills(fills: Sequence[Fill]) -> FillSummary:
+    """Summarise a sequence of fills (e.g. ``order.fills``).
+
+    Args:
+        fills: Fills to summarise.
+
+    Returns:
+        A :class:`FillSummary` (all-zero for an empty sequence).
+    """
+    if not fills:
+        return FillSummary(0, 0.0, 0.0, 0.0, 0.0)
+
+    total_quantity = float(sum(f.quantity for f in fills))
+    notional = float(sum(f.price * f.quantity for f in fills))
+    maker_quantity = float(sum(f.quantity for f in fills if f.liquidity is Liquidity.MAKER))
+    timestamps = [f.ts for f in fills]
+    duration = (max(timestamps) - min(timestamps)).total_seconds()
+
+    return FillSummary(
+        n_fills=len(fills),
+        total_quantity=total_quantity,
+        vwap=notional / total_quantity if total_quantity > 0 else 0.0,
+        maker_fraction=maker_quantity / total_quantity if total_quantity > 0 else 0.0,
+        duration_seconds=float(duration),
     )

@@ -58,7 +58,7 @@ The system currently:
 - runs post-trade transaction-cost analysis — implementation shortfall vs arrival price and VWAP slippage (`src.execution.tca`)
 - offers position-sizing helpers: fractional Kelly, ATR-based, fixed-fractional, volatility-target, CPPI and drawdown-throttle sizing
 - exposes a `Broker` interface with a `PaperBroker` implementation that shares the same OMS — a clean seam for future IB / Alpaca / Binance adapters
-- reports portfolio exposure analytics — gross/net/long/short exposure, leverage and a Herfindahl concentration index — from the OMS (`src.oms.portfolio_exposure`)
+- reports portfolio exposure analytics — gross/net/long/short exposure, leverage and a Herfindahl concentration index — plus per-order fill analytics (VWAP, maker/taker mix, fill duration) from the OMS (`src.oms.portfolio_exposure`, `src.oms.summarize_fills`)
 - computes **30+ performance metrics** including Sharpe, Sortino, Calmar, CAGR, max drawdown, **Value-at-Risk** (historical / parametric), **Conditional VaR**, **Omega ratio**, **Ulcer Index**, **gain-to-pain**, **drawdown duration & recovery time**, **tail ratio**, **downside/upside deviation**, **rolling beta vs benchmark**, **skew / kurtosis**, **tracking error & information ratio**, **Sterling / Burke ratios**, **Treynor / Jensen's alpha / M²**
 - runs walk-forward validation, Monte Carlo bootstrap, trade-shuffle robustness and statistical Sharpe significance tests (t-test, Probabilistic SR, **Deflated SR** for multiple-testing correction), plus a CSCV **Probability of Backtest Overfitting** estimate and **purged & embargoed K-fold** cross-validation
 - aggregates single-asset strategies into a multi-asset portfolio (equal-weight, inverse-vol, custom, min-variance, max-Sharpe, risk-parity, maximum-diversification, or hierarchical-risk-parity weights)
@@ -106,7 +106,7 @@ trading_system/
 │   │   ├── order.py               # Order / OrderStatus / OrderType / Side / TIF
 │   │   ├── position.py            # Per-symbol position with cost basis + PnL
 │   │   ├── portfolio.py           # Cash + positions + equity history
-│   │   └── analytics.py           # Exposure / leverage / concentration report
+│   │   └── analytics.py           # Exposure / leverage / concentration + fill analytics
 │   ├── live/
 │   │   └── broker.py              # Broker interface + PaperBroker implementation
 │   ├── execution/
@@ -529,6 +529,8 @@ from src.oms import portfolio_exposure
 rep = portfolio_exposure(portfolio, {"SPY": 410.0, "QQQ": 310.0})
 print(rep.gross_exposure, rep.leverage, rep.concentration_hhi)
 ```
+
+`summarize_fills(order.fills)` complements it at the order level, reporting the fill VWAP, the maker/taker quantity mix, and the time from first to last fill.
 
 ## Execution / slippage model
 

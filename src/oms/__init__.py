@@ -1,6 +1,11 @@
 """Order management, position tracking, portfolio state."""
 
-from src.oms.analytics import ExposureReport, portfolio_exposure
+from src.oms.analytics import (
+    ExposureReport,
+    FillSummary,
+    portfolio_exposure,
+    summarize_fills,
+)
 from src.oms.order import (
     Fill,
     IllegalOrderTransition,
@@ -33,4 +38,6 @@ __all__ = [
     "Portfolio",
     "ExposureReport",
     "portfolio_exposure",
+    "FillSummary",
+    "summarize_fills",
 ]
