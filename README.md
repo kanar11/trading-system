@@ -57,7 +57,7 @@ The system currently:
 - exposes a `Broker` interface with a `PaperBroker` implementation that shares the same OMS — a clean seam for future IB / Alpaca / Binance adapters
 - reports portfolio exposure analytics — gross/net/long/short exposure, leverage and a Herfindahl concentration index — from the OMS (`src.oms.portfolio_exposure`)
 - computes **25+ performance metrics** including Sharpe, Sortino, Calmar, CAGR, max drawdown, **Value-at-Risk** (historical / parametric), **Conditional VaR**, **Omega ratio**, **Ulcer Index**, **gain-to-pain**, **drawdown duration & recovery time**, **tail ratio**, **downside/upside deviation**, **rolling beta vs benchmark**, **skew / kurtosis**, **tracking error & information ratio**, **Sterling / Burke ratios**
-- runs walk-forward validation, Monte Carlo bootstrap, trade-shuffle robustness and statistical Sharpe significance tests (t-test, Probabilistic SR, **Deflated SR** for multiple-testing correction), plus a CSCV **Probability of Backtest Overfitting** estimate
+- runs walk-forward validation, Monte Carlo bootstrap, trade-shuffle robustness and statistical Sharpe significance tests (t-test, Probabilistic SR, **Deflated SR** for multiple-testing correction), plus a CSCV **Probability of Backtest Overfitting** estimate and **purged & embargoed K-fold** cross-validation
 - aggregates single-asset strategies into a multi-asset portfolio (equal-weight, inverse-vol, custom, min-variance, max-Sharpe, risk-parity, maximum-diversification, or hierarchical-risk-parity weights)
 - runs factor / attribution regression to separate alpha from passive factor exposure
 - generates multi-panel tear-sheet reports (equity, drawdown, rolling Sharpe, monthly heatmap, distribution, metrics table)
@@ -116,7 +116,8 @@ trading_system/
 │   │   ├── walk_forward.py        # Walk-forward validation framework
 │   │   ├── monte_carlo.py         # Bootstrap + trade-shuffle robustness
 │   │   ├── stat_tests.py          # Sharpe t-test, Probabilistic & Deflated SR
-│   │   └── pbo.py                 # Probability of Backtest Overfitting (CSCV)
+│   │   ├── pbo.py                 # Probability of Backtest Overfitting (CSCV)
+│   │   └── purged_cv.py           # Purged & embargoed K-fold CV splits
 │   ├── portfolio/
 │   │   ├── portfolio.py           # Multi-asset portfolio backtest
 │   │   └── optimizer.py           # Min-variance / max-Sharpe / risk-parity weights
@@ -583,6 +584,17 @@ print(result.pbo)   # ~0 generalises · ~0.5 no real edge · ~1 systematic overf
 ```
 
 The series is split into `n_blocks` equal blocks; every choice of half the blocks as in-sample (with the complement out-of-sample) is evaluated. For each split the in-sample-best config's out-of-sample rank is mapped to a logit, and PBO is the fraction of splits where it lands in the bottom half. Pure numpy.
+
+## Purged cross-validation
+
+Plain K-fold leaks information in a backtest — a training bar adjacent to the test fold shares the same market state (and, for multi-bar labels, the same outcome). `src/validation/purged_cv.py` implements López de Prado's fix: **purge** training bars whose window overlaps the test fold and **embargo** a span immediately after it.
+
+```python
+from src.validation import purged_kfold_splits
+
+for train_idx, test_idx in purged_kfold_splits(len(returns), n_splits=5, embargo=0.01, purge=5):
+    ...  # leakage-safe train / test indices
+```
 
 ## Multi-asset portfolio
 
