@@ -55,6 +55,7 @@ The system currently:
 - models realistic execution costs (bid-ask spread + square-root market impact + fixed commission), plus Almgren-Chriss optimal-execution scheduling and participation-rate impact
 - offers position-sizing helpers: fractional Kelly, ATR-based, fixed-fractional, volatility-target, CPPI and drawdown-throttle sizing
 - exposes a `Broker` interface with a `PaperBroker` implementation that shares the same OMS — a clean seam for future IB / Alpaca / Binance adapters
+- reports portfolio exposure analytics — gross/net/long/short exposure, leverage and a Herfindahl concentration index — from the OMS (`src.oms.portfolio_exposure`)
 - computes **25+ performance metrics** including Sharpe, Sortino, Calmar, CAGR, max drawdown, **Value-at-Risk** (historical / parametric), **Conditional VaR**, **Omega ratio**, **Ulcer Index**, **gain-to-pain**, **drawdown duration & recovery time**, **tail ratio**, **downside/upside deviation**, **rolling beta vs benchmark**, **skew / kurtosis**, **tracking error & information ratio**, **Sterling / Burke ratios**
 - runs walk-forward validation, Monte Carlo bootstrap, trade-shuffle robustness and statistical Sharpe significance tests (t-test, Probabilistic SR, **Deflated SR** for multiple-testing correction), plus a CSCV **Probability of Backtest Overfitting** estimate
 - aggregates single-asset strategies into a multi-asset portfolio (equal-weight, inverse-vol, custom, min-variance, max-Sharpe, risk-parity, maximum-diversification, or hierarchical-risk-parity weights)
@@ -96,7 +97,8 @@ trading_system/
 │   ├── oms/                       # Order Management System
 │   │   ├── order.py               # Order / OrderStatus / OrderType / Side / TIF
 │   │   ├── position.py            # Per-symbol position with cost basis + PnL
-│   │   └── portfolio.py           # Cash + positions + equity history
+│   │   ├── portfolio.py           # Cash + positions + equity history
+│   │   └── analytics.py           # Exposure / leverage / concentration report
 │   ├── live/
 │   │   └── broker.py              # Broker interface + PaperBroker implementation
 │   ├── execution/
@@ -483,6 +485,17 @@ print(bk.equity({"SPY": 415.10}))
 ```
 
 The roadmap for real-broker adapters (Interactive Brokers, Alpaca, Binance) is to subclass `Broker` and implement the same six methods.
+
+### Portfolio exposure analytics
+
+`src.oms.portfolio_exposure` turns a `Portfolio` + mark prices into an `ExposureReport` — gross / net / long / short exposure, leverage (gross / equity) and a Herfindahl concentration index (1 = a single position, → 0 = many equal positions):
+
+```python
+from src.oms import portfolio_exposure
+
+rep = portfolio_exposure(portfolio, {"SPY": 410.0, "QQQ": 310.0})
+print(rep.gross_exposure, rep.leverage, rep.concentration_hhi)
+```
 
 ## Execution / slippage model
 
