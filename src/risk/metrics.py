@@ -380,3 +380,70 @@ def burke_ratio(returns: pd.Series) -> float:
     if rss == 0:
         return float("inf") if ann > 0 else 0.0
     return float(ann / rss)
+
+
+# ---------------------------------------------------------------------------
+# CAPM / benchmark-relative ratios
+# ---------------------------------------------------------------------------
+
+
+def _capm_inputs(
+    returns: pd.Series, benchmark: pd.Series
+) -> tuple[pd.Series, pd.Series, float] | None:
+    """Align returns & benchmark and return (strat, bench, beta), or None."""
+    df = pd.concat([returns.rename("s"), benchmark.rename("b")], axis=1, join="inner").dropna()
+    if len(df) < 2:
+        return None
+    strat, bench = df["s"], df["b"]
+    var_b = float(bench.var(ddof=1))
+    if var_b == 0:
+        return None
+    beta = float(strat.cov(bench)) / var_b
+    return strat, bench, beta
+
+
+def treynor_ratio(returns: pd.Series, benchmark: pd.Series, rf_daily: float = 0.0) -> float:
+    """Annualised excess return per unit of market beta (CAPM systematic risk).
+
+    Returns 0.0 when beta is zero or there is too little overlapping data.
+    """
+    inputs = _capm_inputs(returns, benchmark)
+    if inputs is None:
+        return 0.0
+    strat, _, beta = inputs
+    if beta == 0:
+        return 0.0
+    return float((float(strat.mean()) - rf_daily) * TRADING_DAYS / beta)
+
+
+def jensen_alpha(returns: pd.Series, benchmark: pd.Series, rf_daily: float = 0.0) -> float:
+    """Annualised CAPM alpha: actual excess return minus beta-predicted excess.
+
+    ``alpha = (r - rf) - beta * (r_bench - rf)``, annualised. Positive alpha is
+    out-performance not explained by market exposure.
+    """
+    inputs = _capm_inputs(returns, benchmark)
+    if inputs is None:
+        return 0.0
+    strat, bench, beta = inputs
+    alpha_daily = (float(strat.mean()) - rf_daily) - beta * (float(bench.mean()) - rf_daily)
+    return float(alpha_daily * TRADING_DAYS)
+
+
+def m2_ratio(returns: pd.Series, benchmark: pd.Series, rf_daily: float = 0.0) -> float:
+    """Modigliani M²: the strategy's return re-levered to the benchmark's volatility.
+
+    ``M2 = rf + Sharpe_strategy * sigma_benchmark`` (annualised), expressing
+    risk-adjusted performance in the same units as the benchmark's return.
+    Returns 0.0 when the strategy has zero volatility or too little data.
+    """
+    inputs = _capm_inputs(returns, benchmark)
+    if inputs is None:
+        return 0.0
+    strat, bench, _ = inputs
+    strat_std = float(strat.std(ddof=1))
+    if strat_std == 0:
+        return 0.0
+    sharpe_daily = (float(strat.mean()) - rf_daily) / strat_std
+    m2_daily = rf_daily + sharpe_daily * float(bench.std(ddof=1))
+    return float(m2_daily * TRADING_DAYS)
