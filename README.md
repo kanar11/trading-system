@@ -61,6 +61,7 @@ The system currently:
 - computes **30+ performance metrics** including Sharpe, Sortino, Calmar, CAGR, max drawdown, **Value-at-Risk** (historical / parametric), **Conditional VaR**, **Omega ratio**, **Ulcer Index**, **gain-to-pain**, **drawdown duration & recovery time**, **tail ratio**, **downside/upside deviation**, **rolling beta vs benchmark**, **skew / kurtosis**, **tracking error & information ratio**, **Sterling / Burke ratios**, **Treynor / Jensen's alpha / M²**
 - runs walk-forward validation, Monte Carlo bootstrap, trade-shuffle robustness and statistical Sharpe significance tests (t-test, Probabilistic SR, **Deflated SR** for multiple-testing correction), plus a CSCV **Probability of Backtest Overfitting** estimate and **purged & embargoed K-fold** cross-validation
 - aggregates single-asset strategies into a multi-asset portfolio (equal-weight, inverse-vol, custom, min-variance, max-Sharpe, risk-parity, maximum-diversification, or hierarchical-risk-parity weights)
+- analyses portfolio risk — total volatility, per-asset risk contributions, diversification ratio and effective number of assets (`src.portfolio.analytics`)
 - runs factor / attribution regression to separate alpha from passive factor exposure, plus up/down market capture ratios
 - generates multi-panel tear-sheet reports (equity, drawdown, rolling Sharpe, monthly heatmap, distribution, metrics table)
 - tabulates periodic returns — a year x month table with an annual total, per-year returns, and rolling annualised return / volatility / Sharpe (`src.reporting.periodic`)
@@ -125,7 +126,8 @@ trading_system/
 │   │   └── purged_cv.py           # Purged & embargoed K-fold CV splits
 │   ├── portfolio/
 │   │   ├── portfolio.py           # Multi-asset portfolio backtest
-│   │   └── optimizer.py           # Min-variance / max-Sharpe / risk-parity weights
+│   │   ├── optimizer.py           # Min-variance / max-Sharpe / risk-parity / HRP weights
+│   │   └── analytics.py           # Risk contributions / diversification / vol
 │   └── reporting/
 │       ├── metrics.py             # Portfolio metrics + trade analytics
 │       ├── plots.py               # Equity curve plotting
@@ -630,6 +632,16 @@ For covariance-aware allocation, `src/portfolio/optimizer.py` provides five clos
 - **`hierarchical_risk_parity_weights(returns, cov=None)`** — HRP: correlation-distance clustering → quasi-diagonalisation → recursive bisection (López de Prado 2016).
 
 The closed-form optimisers clip negative weights to zero and re-normalise; HRP is long-only by construction.
+
+Risk diagnostics for a given weight vector + covariance live in `src/portfolio/analytics.py`:
+
+```python
+from src.portfolio import diversification_ratio, effective_number_of_assets, risk_contributions
+
+rc = risk_contributions(weights, cov)        # each asset's share of portfolio variance (sums to 1)
+dr = diversification_ratio(weights, cov)     # >= 1; higher = better diversified
+n_eff = effective_number_of_assets(weights)  # inverse-Herfindahl "number of bets"
+```
 
 ```python
 from src.portfolio import PortfolioConfig, run_portfolio_backtest
