@@ -174,3 +174,65 @@ def print_attribution_report(result: AttributionResult, title: str = "Factor Att
     print(f"  R^2:                 {result.r_squared:>8.3f}")
     print(f"  Adj. R^2:            {result.adj_r_squared:>8.3f}")
     print("=" * 60)
+
+
+def _aligned(strategy_returns: pd.Series, benchmark_returns: pd.Series) -> pd.DataFrame:
+    """Inner-join and drop NaNs; columns 0 = strategy, 1 = benchmark."""
+    return pd.concat(
+        [strategy_returns.rename("s"), benchmark_returns.rename("b")],
+        axis=1,
+        join="inner",
+    ).dropna()
+
+
+def up_capture(strategy_returns: pd.Series, benchmark_returns: pd.Series) -> float:
+    """Up-market capture ratio.
+
+    Strategy's mean return on days the benchmark is up, divided by the
+    benchmark's mean up return. > 1 means the strategy amplifies the upside.
+    Returns 0.0 when there are no up days or no overlapping observations.
+    """
+    joined = _aligned(strategy_returns, benchmark_returns)
+    if joined.empty:
+        return 0.0
+    strat, bench = joined["s"], joined["b"]
+    up = bench > 0
+    if not bool(up.any()):
+        return 0.0
+    bench_up = float(bench[up].mean())
+    if bench_up == 0:
+        return 0.0
+    return float(strat[up].mean()) / bench_up
+
+
+def down_capture(strategy_returns: pd.Series, benchmark_returns: pd.Series) -> float:
+    """Down-market capture ratio.
+
+    Strategy's mean return on days the benchmark is down, divided by the
+    benchmark's mean down return. < 1 means the strategy loses less than the
+    benchmark in down markets. Returns 0.0 when there are no down days.
+    """
+    joined = _aligned(strategy_returns, benchmark_returns)
+    if joined.empty:
+        return 0.0
+    strat, bench = joined["s"], joined["b"]
+    down = bench < 0
+    if not bool(down.any()):
+        return 0.0
+    bench_down = float(bench[down].mean())
+    if bench_down == 0:
+        return 0.0
+    return float(strat[down].mean()) / bench_down
+
+
+def capture_ratio(strategy_returns: pd.Series, benchmark_returns: pd.Series) -> float:
+    """Up-capture divided by down-capture.
+
+    Greater than 1 is favourable (more upside than downside capture). Returns
+    +inf when down-capture is zero with positive up-capture.
+    """
+    up = up_capture(strategy_returns, benchmark_returns)
+    down = down_capture(strategy_returns, benchmark_returns)
+    if down == 0:
+        return float("inf") if up > 0 else 0.0
+    return up / down

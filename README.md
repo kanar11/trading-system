@@ -59,7 +59,7 @@ The system currently:
 - computes **25+ performance metrics** including Sharpe, Sortino, Calmar, CAGR, max drawdown, **Value-at-Risk** (historical / parametric), **Conditional VaR**, **Omega ratio**, **Ulcer Index**, **gain-to-pain**, **drawdown duration & recovery time**, **tail ratio**, **downside/upside deviation**, **rolling beta vs benchmark**, **skew / kurtosis**, **tracking error & information ratio**, **Sterling / Burke ratios**
 - runs walk-forward validation, Monte Carlo bootstrap, trade-shuffle robustness and statistical Sharpe significance tests (t-test, Probabilistic SR, **Deflated SR** for multiple-testing correction), plus a CSCV **Probability of Backtest Overfitting** estimate and **purged & embargoed K-fold** cross-validation
 - aggregates single-asset strategies into a multi-asset portfolio (equal-weight, inverse-vol, custom, min-variance, max-Sharpe, risk-parity, maximum-diversification, or hierarchical-risk-parity weights)
-- runs factor / attribution regression to separate alpha from passive factor exposure
+- runs factor / attribution regression to separate alpha from passive factor exposure, plus up/down market capture ratios
 - generates multi-panel tear-sheet reports (equity, drawdown, rolling Sharpe, monthly heatmap, distribution, metrics table)
 - tabulates periodic returns — a year x month table with an annual total, per-year returns, and rolling annualised return / volatility / Sharpe (`src.reporting.periodic`)
 - exports trade logs and parameter sweep results
@@ -644,6 +644,16 @@ print_attribution_report(result)
 ```
 
 Pure OLS via `numpy.linalg.lstsq` — no scipy needed.
+
+The same module exposes benchmark-relative **capture ratios**:
+
+```python
+from src.reporting.attribution import capture_ratio, down_capture, up_capture
+
+up = up_capture(strategy_returns, benchmark_returns)        # > 1 amplifies upside
+down = down_capture(strategy_returns, benchmark_returns)    # < 1 cushions downside
+ratio = capture_ratio(strategy_returns, benchmark_returns)  # up / down; higher is better
+```
 
 ## Tear-sheet report
 
