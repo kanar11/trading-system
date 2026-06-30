@@ -47,7 +47,7 @@ The system currently:
 - aggregates intraday bars to any frequency via `src.data.resample` (1m → 5m → 1h → 1D → 1W → 1ME)
 - audits OHLCV data quality — duplicate timestamps, unsorted index, missing values, OHLC inconsistencies, extreme returns, stale-price runs — and conservatively cleans it (`src.data.quality`)
 - generates synthetic GBM OHLCV for offline demos and tests — always OHLC-consistent and positive (`src.data.synthetic`)
-- maintains a comprehensive technical-indicators library (`src.indicators`): SMA / EMA / WMA / VWMA, RSI, MACD, Stochastic, Williams %R, CCI, ROC, ATR (SMA/EMA/Wilder smoothings), Bollinger, Keltner, Donchian, OBV, anchored VWAP, Chaikin A/D, Hull MA, Aroon, TRIX, CMO, MFI
+- maintains a comprehensive technical-indicators library (`src.indicators`): SMA / EMA / WMA / VWMA, RSI, MACD, Stochastic, Williams %R, CCI, ROC, ATR (SMA/EMA/Wilder smoothings), Bollinger, Keltner, Donchian, OBV, anchored VWAP, Chaikin A/D, Hull MA, Aroon, TRIX, CMO, MFI, SuperTrend, Vortex
 - generates trading signals using nine strategy templates: momentum, mean reversion, Donchian breakout, EMA crossover, MACD, TRIX, MFI mean reversion, pairs (cointegration), and adaptive (regime-based)
 - combines multiple strategies via majority vote, weighted sum or unanimous-consent ensemble combiners
 - detects market regimes (trending vs mean-reverting) using ADX and Hurst exponent, or a data-driven Gaussian HMM (Baum-Welch EM + Viterbi, pure numpy)
@@ -742,9 +742,9 @@ Core portfolio-level metrics computed from the daily return series:
 
 | Family       | Indicators                                                                       |
 |--------------|----------------------------------------------------------------------------------|
-| Trend        | `sma`, `ema`, `wma`, `vwma`, `hma`, `aroon`                                      |
+| Trend        | `sma`, `ema`, `wma`, `vwma`, `hma`, `aroon`, `vortex`                            |
 | Momentum     | `rsi`, `macd`, `stochastic`, `williams_r`, `cci`, `roc`, `trix`, `cmo`           |
-| Volatility   | `atr` (sma/ema/wilder), `bollinger`, `keltner`, `donchian`                       |
+| Volatility   | `atr` (sma/ema/wilder), `bollinger`, `keltner`, `donchian`, `supertrend`         |
 | Volume       | `obv`, `vwap` (anchored), `chaikin_ad`, `mfi`                                    |
 
 ```python

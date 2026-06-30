@@ -81,3 +81,29 @@ def aroon(high: pd.Series, low: pd.Series, period: int = 25) -> pd.DataFrame:
     up = 100 * (period - high_age) / period
     down = 100 * (period - low_age) / period
     return pd.DataFrame({"up": up, "down": down, "oscillator": up - down})
+
+
+def vortex(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.DataFrame:
+    """Vortex Indicator (Botes & Siepman, 2010).
+
+    Captures the strength of up vs down trend movement:
+        VI+ = sum(|high - prev_low|)  / sum(true_range)
+        VI- = sum(|low  - prev_high|) / sum(true_range)
+    over ``period`` bars. VI+ crossing above VI- signals an emerging up-trend.
+
+    Returns a DataFrame with ``vi_plus`` and ``vi_minus`` columns.
+    """
+    if period < 1:
+        raise ValueError(f"period must be >= 1, got {period}.")
+
+    prev_close = close.shift(1)
+    true_range = pd.concat(
+        [high - low, (high - prev_close).abs(), (low - prev_close).abs()], axis=1
+    ).max(axis=1)
+    vm_plus = (high - low.shift(1)).abs()
+    vm_minus = (low - high.shift(1)).abs()
+
+    tr_sum = true_range.rolling(period, min_periods=period).sum().replace(0, np.nan)
+    vi_plus = vm_plus.rolling(period, min_periods=period).sum() / tr_sum
+    vi_minus = vm_minus.rolling(period, min_periods=period).sum() / tr_sum
+    return pd.DataFrame({"vi_plus": vi_plus, "vi_minus": vi_minus})
