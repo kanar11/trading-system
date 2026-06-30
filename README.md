@@ -47,7 +47,7 @@ The system currently:
 - aggregates intraday bars to any frequency via `src.data.resample` (1m → 5m → 1h → 1D → 1W → 1ME)
 - audits OHLCV data quality — duplicate timestamps, unsorted index, missing values, OHLC inconsistencies, extreme returns, stale-price runs — and conservatively cleans it (`src.data.quality`)
 - maintains a comprehensive technical-indicators library (`src.indicators`): SMA / EMA / WMA / VWMA, RSI, MACD, Stochastic, Williams %R, CCI, ROC, ATR (SMA/EMA/Wilder smoothings), Bollinger, Keltner, Donchian, OBV, anchored VWAP, Chaikin A/D, Hull MA, Aroon, TRIX, CMO, MFI
-- generates trading signals using eight strategy templates: momentum, mean reversion, Donchian breakout, EMA crossover, MACD, TRIX, pairs (cointegration), and adaptive (regime-based)
+- generates trading signals using nine strategy templates: momentum, mean reversion, Donchian breakout, EMA crossover, MACD, TRIX, MFI mean reversion, pairs (cointegration), and adaptive (regime-based)
 - combines multiple strategies via majority vote, weighted sum or unanimous-consent ensemble combiners
 - detects market regimes (trending vs mean-reverting) using ADX and Hurst exponent, or a data-driven Gaussian HMM (Baum-Welch EM + Viterbi, pure numpy)
 - runs **vectorised** backtests with transaction costs, volatility targeting and a risk middleware (stop-loss, take-profit, trailing stop, position limits, daily loss limit)
@@ -89,6 +89,7 @@ trading_system/
 │   │   ├── breakout.py            # Donchian channel breakout (turtle-style)
 │   │   ├── ema_crossover.py       # Fast/slow EMA and MACD crossover signals
 │   │   ├── trix.py                # TRIX triple-EMA trend-following strategy
+│   │   ├── mfi.py                 # Money Flow Index mean-reversion strategy
 │   │   ├── pairs.py               # Cointegration-based pairs trading
 │   │   └── ensemble.py            # Majority / weighted / unanimous combiners
 │   ├── backtest/
@@ -332,6 +333,16 @@ TRIX is the rate of change of a triple-smoothed EMA — a low-noise trend oscill
 from src.strategy.trix import trix_strategy
 
 signals = trix_strategy(df, period=15, use_signal_line=False, allow_short=True)
+```
+
+### MFI mean reversion
+
+A volume-aware mean-reversion baseline: the Money Flow Index (a volume-weighted RSI) enters against extremes — long when MFI falls below `oversold`, short when it rises above `overbought` — and holds the position until MFI reverts to a neutral `exit_level`. Requires `high`, `low`, `close` and `volume`; reuses the shared `mfi` indicator.
+
+```python
+from src.strategy.mfi import mfi_strategy
+
+signals = mfi_strategy(df, period=14, oversold=20, overbought=80, allow_short=True)
 ```
 
 ### Pairs trading (cointegration)
