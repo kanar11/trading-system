@@ -33,6 +33,10 @@ include = ["src*"]
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "--strict-markers"
+filterwarnings = [
+    # upstream matplotlib date-axis plotting vs numpy>=2.5 timedelta deprecation
+    "ignore:The 'generic' unit for NumPy timedelta is deprecated:DeprecationWarning",
+]
 
 [tool.ruff]
 line-length = 100
@@ -61,7 +65,9 @@ ignore = [
 "src/strategy/base.py" = ["B027"]
 
 [tool.mypy]
-python_version = "3.11"
+# Target 3.12 so mypy can parse modern numpy stubs (PEP 695 `type` aliases).
+# Runtime still supports >=3.11 (see requires-python); CI runs pytest on 3.11.
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
