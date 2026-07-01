@@ -43,7 +43,7 @@ Plug-in points: indicators (`src.indicators`), position sizing (`src.risk.sizing
 The system currently:
 
 - downloads OHLCV data via `yfinance` or local CSV, with a transparent parquet-backed cache (`src.data.cache`)
-- ships pre-defined universes (FAANG, Dow 30, sector ETFs, benchmarks, factor ETFs) in `src.data.universe`
+- ships pre-defined universes (FAANG, Dow 30, sector ETFs, benchmarks, factor ETFs) in `src.data.universe`, with list / combine / membership helpers
 - aggregates intraday bars to any frequency via `src.data.resample` (1m → 5m → 1h → 1D → 1W → 1ME)
 - audits OHLCV data quality — duplicate timestamps, unsorted index, missing values, OHLC inconsistencies, extreme returns, stale-price runs — and conservatively cleans it (`src.data.quality`)
 - generates synthetic GBM OHLCV for offline demos and tests — always OHLC-consistent and positive (`src.data.synthetic`)
@@ -846,7 +846,7 @@ vw = vwap(df["close"], df["volume"], anchor="D")
 - **`load_yahoo_ohlcv` / `load_csv_ohlcv`** — primary downloaders.
 - **`CachedLoader`** — drop-in wrapper that persists downloaded frames to `~/.trading_system_cache/` (parquet preferred, CSV fallback) so repeat backtests don't hit the network.
 - **`resample_ohlcv` / `to_daily` / `to_weekly` / `to_monthly`** — aggregate intraday bars (open=first, high=max, low=min, close=last, volume=sum).
-- **`get_universe(name)`** — pre-defined baskets: `faang`, `faang_plus`, `dow30`, `sectors`, `benchmarks`, `factors`.
+- **`get_universe(name)` / `list_universes()` / `combine_universes(...)` / `in_universe(ticker, name)`** — pre-defined baskets (`faang`, `faang_plus`, `dow30`, `sectors`, `benchmarks`, `factors`) with list / order-preserving-union / membership helpers.
 - **`generate_gbm_ohlcv(...)`** — a geometric-Brownian-motion OHLCV generator for offline demos and tests; always OHLC-consistent and positive (passes `check_ohlcv`).
 - **`check_ohlcv(df)` / `clean_ohlcv(df)`** — audit a frame for duplicates, gaps, OHLC inconsistencies, extreme returns and stale prices (returns a `DataQualityReport`), then drop the untrustworthy rows.
 
