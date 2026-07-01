@@ -13,6 +13,7 @@ from src.regime.hmm import (
     fit_gaussian_hmm,
 )
 from src.regime.transitions import regime_durations, regime_transition_matrix
+from src.regime.turbulence import financial_turbulence, turbulent_periods
 
 __all__ = [
     "RegimeConfig",
@@ -25,4 +26,6 @@ __all__ = [
     "fit_gaussian_hmm",
     "regime_transition_matrix",
     "regime_durations",
+    "financial_turbulence",
+    "turbulent_periods",
 ]
