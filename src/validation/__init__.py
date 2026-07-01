@@ -2,6 +2,7 @@
 
 from src.validation.pbo import PBOResult, probability_of_backtest_overfitting
 from src.validation.purged_cv import purged_kfold_splits
+from src.validation.reality_check import RealityCheckResult, whites_reality_check
 from src.validation.walk_forward import (
     FoldResult,
     WalkForwardConfig,
@@ -17,4 +18,6 @@ __all__ = [
     "PBOResult",
     "probability_of_backtest_overfitting",
     "purged_kfold_splits",
+    "RealityCheckResult",
+    "whites_reality_check",
 ]

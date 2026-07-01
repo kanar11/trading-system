@@ -61,7 +61,7 @@ The system currently:
 - exposes a `Broker` interface with a `PaperBroker` implementation that shares the same OMS — a clean seam for future IB / Alpaca / Binance adapters
 - reports portfolio exposure analytics — gross/net/long/short exposure, leverage and a Herfindahl concentration index — plus per-order fill analytics (VWAP, maker/taker mix, fill duration) from the OMS (`src.oms.portfolio_exposure`, `src.oms.summarize_fills`)
 - computes **30+ performance metrics** including Sharpe, Sortino, Calmar, CAGR, max drawdown, **Value-at-Risk** (historical / parametric), **Conditional VaR**, **Omega ratio**, **Ulcer Index**, **gain-to-pain**, **drawdown duration & recovery time**, **tail ratio**, **downside/upside deviation**, **rolling beta vs benchmark**, **skew / kurtosis**, **tracking error & information ratio**, **Sterling / Burke ratios**, **Treynor / Jensen's alpha / M²**
-- runs walk-forward validation, Monte Carlo bootstrap, trade-shuffle robustness and statistical Sharpe significance tests (t-test, Probabilistic SR, **Deflated SR** for multiple-testing correction), plus a CSCV **Probability of Backtest Overfitting** estimate and **purged & embargoed K-fold** cross-validation
+- runs walk-forward validation, Monte Carlo bootstrap, trade-shuffle robustness and statistical Sharpe significance tests (t-test, Probabilistic SR, **Deflated SR** for multiple-testing correction), plus a CSCV **Probability of Backtest Overfitting** estimate, **purged & embargoed K-fold** cross-validation, and **White's Reality Check** for data-snooping
 - aggregates single-asset strategies into a multi-asset portfolio (equal-weight, inverse-vol, custom, min-variance, max-Sharpe, risk-parity, maximum-diversification, or hierarchical-risk-parity weights)
 - analyses portfolio risk — total volatility, per-asset risk contributions, diversification ratio and effective number of assets (`src.portfolio.analytics`)
 - runs factor / attribution regression to separate alpha from passive factor exposure, plus up/down market capture ratios
@@ -129,7 +129,8 @@ trading_system/
 │   │   ├── monte_carlo.py         # Bootstrap + trade-shuffle robustness
 │   │   ├── stat_tests.py          # Sharpe t-test, Probabilistic & Deflated SR
 │   │   ├── pbo.py                 # Probability of Backtest Overfitting (CSCV)
-│   │   └── purged_cv.py           # Purged & embargoed K-fold CV splits
+│   │   ├── purged_cv.py           # Purged & embargoed K-fold CV splits
+│   │   └── reality_check.py       # White's Reality Check (data-snooping)
 │   ├── portfolio/
 │   │   ├── portfolio.py           # Multi-asset portfolio backtest
 │   │   ├── optimizer.py           # Min-variance / max-Sharpe / risk-parity / HRP weights
@@ -649,6 +650,19 @@ from src.validation import purged_kfold_splits
 for train_idx, test_idx in purged_kfold_splits(len(returns), n_splits=5, embargo=0.01, purge=5):
     ...  # leakage-safe train / test indices
 ```
+
+## White's Reality Check
+
+When you keep the best of many strategies, its edge is inflated by the search. `src/validation/reality_check.py` runs White's (2000) bootstrap reality check on a `(T, N)` panel of per-strategy performance, testing whether the *best* strategy beats the benchmark after correcting for having tried all N.
+
+```python
+from src.validation import whites_reality_check
+
+result = whites_reality_check(excess_returns, n_bootstrap=1000, block_size=5, seed=0)
+print(result.p_value, result.best_strategy)  # small p -> the best edge is real
+```
+
+A moving-block bootstrap preserves short-range autocorrelation; the p-value is the share of recentred bootstrap max-statistics that exceed the observed one.
 
 ## Multi-asset portfolio
 
