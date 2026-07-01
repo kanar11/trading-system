@@ -18,7 +18,7 @@ pandas. Functions are pure (no in-place mutation of inputs).
 """
 
 from src.indicators.momentum import cci, cmo, macd, roc, rsi, stochastic, trix, williams_r
-from src.indicators.trend import aroon, ema, hma, sma, vortex, vwma, wma
+from src.indicators.trend import aroon, ema, hma, ichimoku, sma, vortex, vwma, wma
 from src.indicators.volatility import atr, bollinger, donchian, keltner, supertrend
 from src.indicators.volume import chaikin_ad, mfi, obv, vwap
 
@@ -31,6 +31,7 @@ __all__ = [
     "hma",
     "aroon",
     "vortex",
+    "ichimoku",
     # momentum
     "rsi",
     "macd",

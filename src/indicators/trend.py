@@ -107,3 +107,51 @@ def vortex(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) 
     vi_plus = vm_plus.rolling(period, min_periods=period).sum() / tr_sum
     vi_minus = vm_minus.rolling(period, min_periods=period).sum() / tr_sum
     return pd.DataFrame({"vi_plus": vi_plus, "vi_minus": vi_minus})
+
+
+def ichimoku(
+    high: pd.Series,
+    low: pd.Series,
+    close: pd.Series,
+    conversion: int = 9,
+    base: int = 26,
+    span_b: int = 52,
+    displacement: int = 26,
+) -> pd.DataFrame:
+    """Ichimoku Kinko Hyo cloud components.
+
+    Each line is a midpoint of rolling highs/lows; the leading spans are shifted
+    forward by ``displacement`` and the lagging span backward, matching the
+    standard causal representation on the input index.
+
+    Returns a DataFrame with columns:
+        * ``tenkan``    — conversion line, midpoint over ``conversion`` bars.
+        * ``kijun``     — base line, midpoint over ``base`` bars.
+        * ``senkou_a``  — leading span A, (tenkan + kijun) / 2 shifted forward.
+        * ``senkou_b``  — leading span B, midpoint over ``span_b`` shifted forward.
+        * ``chikou``    — lagging span, close shifted back by ``displacement``.
+
+    Raises:
+        ValueError: If a window is < 1 or ``displacement`` < 0.
+    """
+    if min(conversion, base, span_b) < 1:
+        raise ValueError("conversion/base/span_b must be >= 1")
+    if displacement < 0:
+        raise ValueError(f"displacement must be >= 0, got {displacement}")
+
+    def _midpoint(window: int) -> pd.Series:
+        highest = high.rolling(window, min_periods=window).max()
+        lowest = low.rolling(window, min_periods=window).min()
+        return (highest + lowest) / 2
+
+    tenkan = _midpoint(conversion)
+    kijun = _midpoint(base)
+    return pd.DataFrame(
+        {
+            "tenkan": tenkan,
+            "kijun": kijun,
+            "senkou_a": ((tenkan + kijun) / 2).shift(displacement),
+            "senkou_b": _midpoint(span_b).shift(displacement),
+            "chikou": close.shift(-displacement),
+        }
+    )
