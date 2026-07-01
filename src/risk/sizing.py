@@ -13,6 +13,7 @@ Sizing styles provided:
     - volatility_target_size: Scale exposure toward a target volatility.
     - cppi_fraction:          CPPI risky exposure above a protective floor.
     - drawdown_throttle:      De-risk as drawdown approaches a tolerated cap.
+    - optimal_f:              Ralph Vince f maximising geometric growth.
 """
 
 from __future__ import annotations
@@ -202,3 +203,40 @@ def drawdown_throttle(
         return 0.0
     scale = 1.0 - abs(current_drawdown) / max_drawdown
     return float(np.clip(scale, 0.0, 1.0) * max_size)
+
+
+def optimal_f(
+    trades: pd.Series | np.ndarray | list[float],
+    cap: float = 1.0,
+    resolution: int = 1000,
+) -> float:
+    """Ralph Vince optimal ``f`` from a set of trade outcomes.
+
+    Finds the fraction ``f`` in (0, 1) that maximises the Terminal Wealth
+    Relative ``prod(1 + f * trade_i / |worst_loss|)`` — i.e. the geometric
+    growth rate of capital risked per trade.
+
+    Args:
+        trades: Per-trade P&L or returns (sign matters; losses negative).
+        cap: Hard cap on the returned fraction.
+        resolution: Number of grid points searched over (0, 1).
+
+    Returns:
+        Optimal ``f`` in [0, cap]. Returns 0.0 with no positive expectancy or
+        no data, and ``cap`` when there are no losing trades (growth unbounded).
+    """
+    t = np.asarray(pd.Series(trades).dropna(), dtype=float)
+    if t.size == 0:
+        return 0.0
+
+    worst = -float(t.min())
+    if worst <= 0:  # no losing trade -> TWR grows without bound in f
+        return float(cap)
+    if float(t.mean()) <= 0:  # no edge -> risk nothing
+        return 0.0
+
+    fs = np.linspace(1e-4, 1.0 - 1e-4, resolution)
+    ratios = t / worst
+    log_twr = np.log1p(np.outer(fs, ratios)).sum(axis=1)
+    best_f = float(fs[int(np.argmax(log_twr))])
+    return float(min(best_f, cap))
