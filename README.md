@@ -53,6 +53,7 @@ The system currently:
 - detects market regimes (trending vs mean-reverting) using ADX and Hurst exponent, or a data-driven Gaussian HMM (Baum-Welch EM + Viterbi, pure numpy), with transition-matrix and dwell-time analytics
 - runs **vectorised** backtests with transaction costs, volatility targeting and a risk middleware (stop-loss, take-profit, trailing stop, position limits, daily loss limit)
 - summarises the strategy's position path — time in market, average long/short exposure, turnover and trade count (`src.backtest.summarize_exposure`)
+- builds reusable equity and underwater (drawdown) curves from any return series (`src.backtest.equity_curve` / `drawdown_series`)
 - runs **event-driven** backtests through a full OMS — MARKET / LIMIT / STOP / STOP_LIMIT orders, DAY / GTC / IOC / FOK TIF, intrabar limit matching, gap-safe stop fills, partial fills, weighted-avg cost basis, realized vs unrealized PnL splits
 - models realistic execution costs (bid-ask spread + square-root market impact + fixed commission), plus Almgren-Chriss optimal-execution scheduling and participation-rate impact
 - runs post-trade transaction-cost analysis — implementation shortfall vs arrival price and VWAP slippage (`src.execution.tca`)
@@ -101,7 +102,8 @@ trading_system/
 │   ├── backtest/
 │   │   ├── engine.py              # Vectorised cost-aware backtest engine
 │   │   ├── event_engine.py        # Event-driven engine with full OMS
-│   │   └── exposure.py            # Position-path exposure / turnover summary
+│   │   ├── exposure.py            # Position-path exposure / turnover summary
+│   │   └── curves.py              # Equity + underwater (drawdown) curves
 │   ├── oms/                       # Order Management System
 │   │   ├── order.py               # Order / OrderStatus / OrderType / Side / TIF
 │   │   ├── position.py            # Per-symbol position with cost basis + PnL
