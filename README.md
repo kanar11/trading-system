@@ -67,6 +67,7 @@ The system currently:
 - runs factor / attribution regression to separate alpha from passive factor exposure, plus up/down market capture ratios
 - generates multi-panel tear-sheet reports (equity, drawdown, rolling Sharpe, monthly heatmap, distribution, metrics table)
 - tabulates periodic returns — a year x month table with an annual total, per-year returns, and rolling annualised return / volatility / Sharpe (`src.reporting.periodic`)
+- tabulates the worst drawdown episodes — peak / trough / recovery dates, depth and length (`src.reporting.drawdown_table`)
 - exports trade logs and parameter sweep results
 - ships an end-to-end `examples/full_demo.py` and a GitHub Actions CI workflow
 
@@ -140,7 +141,8 @@ trading_system/
 │       ├── sweep.py               # Parameter sweep runner
 │       ├── tearsheet.py           # Multi-panel PNG tear-sheet report
 │       ├── attribution.py         # Factor / alpha regression
-│       └── periodic.py            # Calendar return tables + rolling metrics
+│       ├── periodic.py            # Calendar return tables + rolling metrics
+│       └── drawdowns.py           # Worst-drawdown episode table
 ├── tests/
 │   ├── conftest.py                # Shared fixtures (OHLCV, returns)
 │   ├── test_metrics.py            # Portfolio + trade-level metric tests
@@ -747,6 +749,16 @@ roll = rolling_metrics(returns, window=63)  # rolling annualised return / volati
 ```
 
 All three expect a Series indexed by a DatetimeIndex and never mutate the input.
+
+### Drawdown table
+
+`src/reporting/drawdowns.py` decomposes the equity path into distinct peak-to-trough-to-recovery episodes and returns the deepest ones:
+
+```python
+from src.reporting.drawdowns import drawdown_table
+
+worst = drawdown_table(returns, top_n=5)  # peak / trough / recovery dates, depth, length
+```
 
 ## Trade-level analytics
 
