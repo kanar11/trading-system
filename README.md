@@ -50,7 +50,7 @@ The system currently:
 - maintains a comprehensive technical-indicators library (`src.indicators`): SMA / EMA / WMA / VWMA, RSI, MACD, Stochastic, Williams %R, CCI, ROC, ATR (SMA/EMA/Wilder smoothings), Bollinger, Keltner, Donchian, OBV, anchored VWAP, Chaikin A/D, Hull MA, Aroon, TRIX, CMO, MFI, SuperTrend, Vortex
 - generates trading signals using ten strategy templates: momentum, mean reversion, Donchian breakout, EMA crossover, MACD, TRIX, MFI mean reversion, HMM regime-switching, pairs (cointegration), and adaptive (regime-based)
 - combines multiple strategies via majority vote, weighted sum or unanimous-consent ensemble combiners
-- detects market regimes (trending vs mean-reverting) using ADX and Hurst exponent, or a data-driven Gaussian HMM (Baum-Welch EM + Viterbi, pure numpy)
+- detects market regimes (trending vs mean-reverting) using ADX and Hurst exponent, or a data-driven Gaussian HMM (Baum-Welch EM + Viterbi, pure numpy), with transition-matrix and dwell-time analytics
 - runs **vectorised** backtests with transaction costs, volatility targeting and a risk middleware (stop-loss, take-profit, trailing stop, position limits, daily loss limit)
 - summarises the strategy's position path — time in market, average long/short exposure, turnover and trade count (`src.backtest.summarize_exposure`)
 - runs **event-driven** backtests through a full OMS — MARKET / LIMIT / STOP / STOP_LIMIT orders, DAY / GTC / IOC / FOK TIF, intrabar limit matching, gap-safe stop fills, partial fills, weighted-avg cost basis, realized vs unrealized PnL splits
@@ -119,7 +119,8 @@ trading_system/
 │   │   └── metrics.py             # VaR / CVaR / Omega / Ulcer / drawdown stats / rolling beta
 │   ├── regime/
 │   │   ├── detector.py            # Market regime detection (ADX + Hurst)
-│   │   └── hmm.py                 # Gaussian HMM regime detector (Baum-Welch + Viterbi)
+│   │   ├── hmm.py                 # Gaussian HMM regime detector (Baum-Welch + Viterbi)
+│   │   └── transitions.py         # Regime transition matrix + dwell times
 │   ├── validation/
 │   │   ├── walk_forward.py        # Walk-forward validation framework
 │   │   ├── monte_carlo.py         # Bootstrap + trade-shuffle robustness
@@ -414,6 +415,18 @@ print(result.state_means, result.transition, result.log_likelihood)
 ```
 
 The scaled forward-backward pass keeps the likelihood numerically stable on long series, and `HMMResult.posterior` exposes the smoothed `P(state | data)` for soft-allocation use.
+
+### Regime transition analytics
+
+`src/regime/transitions.py` summarises any regime-label series (from either detector or the HMM): `regime_transition_matrix` gives the empirical first-order Markov transition probabilities (each row sums to 1) and `regime_durations` gives the average dwell time per regime.
+
+```python
+from src.regime import regime_durations, regime_transition_matrix
+
+states = detect_hmm_regime(returns, n_states=2)
+transitions = regime_transition_matrix(states)   # P(next | current)
+dwell = regime_durations(states)                 # mean bars spent in each regime
+```
 
 ## Risk management
 
