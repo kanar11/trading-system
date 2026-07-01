@@ -48,7 +48,7 @@ The system currently:
 - audits OHLCV data quality — duplicate timestamps, unsorted index, missing values, OHLC inconsistencies, extreme returns, stale-price runs — and conservatively cleans it (`src.data.quality`)
 - generates synthetic GBM OHLCV for offline demos and tests — always OHLC-consistent and positive (`src.data.synthetic`)
 - maintains a comprehensive technical-indicators library (`src.indicators`): SMA / EMA / WMA / VWMA, RSI, MACD, Stochastic, Williams %R, CCI, ROC, ATR (SMA/EMA/Wilder smoothings), Bollinger, Keltner, Donchian, OBV, anchored VWAP, Chaikin A/D, Hull MA, Aroon, TRIX, CMO, MFI, SuperTrend, Vortex, Ichimoku
-- generates trading signals using ten strategy templates: momentum, mean reversion, Donchian breakout, EMA crossover, MACD, TRIX, MFI mean reversion, HMM regime-switching, pairs (cointegration), and adaptive (regime-based)
+- generates trading signals using eleven strategy templates: momentum, mean reversion, Donchian breakout, EMA crossover, MACD, TRIX, MFI mean reversion, HMM regime-switching, Bollinger/Keltner squeeze, pairs (cointegration), and adaptive (regime-based)
 - combines multiple strategies via majority vote, weighted sum or unanimous-consent ensemble combiners
 - detects market regimes (trending vs mean-reverting) using ADX and Hurst exponent, or a data-driven Gaussian HMM (Baum-Welch EM + Viterbi, pure numpy), with transition-matrix and dwell-time analytics
 - runs **vectorised** backtests with transaction costs, volatility targeting and a risk middleware (stop-loss, take-profit, trailing stop, position limits, daily loss limit)
@@ -98,6 +98,7 @@ trading_system/
 │   │   ├── trix.py                # TRIX triple-EMA trend-following strategy
 │   │   ├── mfi.py                 # Money Flow Index mean-reversion strategy
 │   │   ├── hmm_regime.py          # Gaussian-HMM regime-switching strategy
+│   │   ├── squeeze.py             # Bollinger/Keltner squeeze breakout
 │   │   ├── pairs.py               # Cointegration-based pairs trading
 │   │   └── ensemble.py            # Majority / weighted / unanimous combiners
 │   ├── backtest/
@@ -372,6 +373,16 @@ signals = hmm_regime_strategy(df, n_states=2, allow_short=True)
 ```
 
 The HMM is fit in-sample, so run it inside walk-forward validation (which refits per fold) for leakage-controlled out-of-sample results.
+
+### Squeeze breakout (Bollinger / Keltner)
+
+Stays flat while the Bollinger Bands sit inside the Keltner Channels (a low-volatility squeeze) and takes the momentum direction once the squeeze releases. Needs `high`, `low` and `close`; reuses the shared `bollinger`, `keltner` and `sma` indicators.
+
+```python
+from src.strategy.squeeze import squeeze_strategy
+
+signals = squeeze_strategy(df, bb_std=2.0, kc_atr_mult=1.5, allow_short=True)
+```
 
 ### Pairs trading (cointegration)
 
