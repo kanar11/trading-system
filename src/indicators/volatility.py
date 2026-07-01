@@ -165,3 +165,19 @@ def supertrend(
         direction[i] = 1 if up else -1
 
     return pd.DataFrame({"supertrend": line, "direction": direction}, index=close.index)
+
+
+def chaikin_volatility(high: pd.Series, low: pd.Series, period: int = 10) -> pd.Series:
+    """Chaikin Volatility: the rate of change of an EMA of the high-low range.
+
+    Positive when the trading range is widening (rising volatility), negative
+    when it is contracting.
+
+    Raises:
+        ValueError: If ``period`` < 1.
+    """
+    if period < 1:
+        raise ValueError(f"period must be >= 1, got {period}.")
+    ema_range = ema(high - low, period)
+    out: pd.Series = 100 * ema_range.pct_change(period)
+    return out

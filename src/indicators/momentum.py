@@ -123,3 +123,25 @@ def cmo(close: pd.Series, period: int = 14) -> pd.Series:
     sum_down = down.rolling(period, min_periods=period).sum()
     denom = (sum_up + sum_down).replace(0, np.nan)
     return 100 * (sum_up - sum_down) / denom
+
+
+def elder_ray(
+    high: pd.Series,
+    low: pd.Series,
+    close: pd.Series,
+    period: int = 13,
+) -> pd.DataFrame:
+    """Elder-Ray bull / bear power around an EMA baseline.
+
+        bull_power = high - EMA(close, period)   (buyers' strength, > 0 in up-trends)
+        bear_power = low  - EMA(close, period)   (sellers' strength, < 0 in down-trends)
+
+    Returns a DataFrame with ``bull_power`` and ``bear_power`` columns.
+
+    Raises:
+        ValueError: If ``period`` < 1.
+    """
+    if period < 1:
+        raise ValueError(f"period must be >= 1, got {period}.")
+    baseline = ema(close, period)
+    return pd.DataFrame({"bull_power": high - baseline, "bear_power": low - baseline})
