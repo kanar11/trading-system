@@ -20,7 +20,18 @@ Fill model:
       ([low, high]) touches it.
     * STOP orders convert to MARKET when triggered, filling at
       next-bar open (gap-safe).
-    * STOP_LIMIT triggers at stop_price and then behaves like a LIMIT.
+    * STOP_LIMIT triggers at stop_price and then behaves like a LIMIT
+      (with the same gap protection: a bar that opens through the stop
+      fills at the better of open/limit).
+
+Time-in-force:
+    * GTC orders rest until filled or cancelled.
+    * DAY orders live for exactly one matching session (the bar after
+      submission — this engine treats one bar as one day) and are
+      cancelled at that bar's close if still unfilled.
+    * IOC / FOK orders get a single matching attempt and are cancelled
+      immediately after it. Fills here are always all-or-nothing for
+      the remaining quantity, so IOC and FOK coincide.
 
 Slippage is applied as a fraction of the fill price in the
 unfavourable direction (buys pay more, sells receive less).
@@ -35,7 +46,7 @@ from typing import Protocol
 
 import pandas as pd
 
-from src.oms import Order, OrderStatus, OrderType, Portfolio, Side, TimeInForce
+from src.oms import Liquidity, Order, OrderStatus, OrderType, Portfolio, Side, TimeInForce
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +147,10 @@ class EventEngine:
     _next_order_id: itertools.count = field(default_factory=lambda: itertools.count(1))
     _orders: list[Order] = field(default_factory=list)
     _portfolio: Portfolio | None = None
+    # bar index the engine is currently processing (-1 before run() starts);
+    # orders remember the bar they were submitted on for TIF expiry
+    _bar_index: int = -1
+    _submit_bar: dict[int, int] = field(default_factory=dict)
 
     # -----------------------------------------------------------------
     # Public API
@@ -171,6 +186,7 @@ class EventEngine:
         order.order_id = next(self._next_order_id)
         order.status = OrderStatus.WORKING
         self._orders.append(order)
+        self._submit_bar[order.order_id] = self._bar_index
         return order
 
     def cancel_all(self, symbol: str | None = None) -> int:
@@ -191,9 +207,11 @@ class EventEngine:
 
         On each bar:
             1. Match any working orders against the current bar's prices.
-            2. Mark-to-market the portfolio at the bar's close.
-            3. Call ``strategy.on_bar(ctx)`` to allow new orders.
+            2. Cancel unfilled IOC/FOK orders (single matching attempt).
+            3. Mark-to-market the portfolio at the bar's close.
+            4. Call ``strategy.on_bar(ctx)`` to allow new orders.
                (New orders are matched on the *next* bar to avoid look-ahead.)
+            5. Cancel unfilled DAY orders whose session (one bar) has ended.
 
         Args:
             df: OHLCV DataFrame indexed by date.
@@ -212,14 +230,18 @@ class EventEngine:
         for i in range(n):
             ts = df.index[i]
             bar = df.iloc[i]
+            self._bar_index = i
 
             # 1. match working orders against THIS bar
             self._match_orders_on_bar(ts, bar)
 
-            # 2. mark-to-market at the close
+            # 2. IOC/FOK expire right after their single matching attempt
+            self._expire_orders(i, (TimeInForce.IOC, TimeInForce.FOK))
+
+            # 3. mark-to-market at the close
             portfolio.mark_to_market(ts, {self.symbol: float(bar["close"])})
 
-            # 3. let the strategy place new orders for the next bar
+            # 4. let the strategy place new orders for the next bar
             ctx = Context(
                 ts=ts,
                 bar=bar,
@@ -230,22 +252,11 @@ class EventEngine:
             )
             strategy.on_bar(ctx)
 
-            # 4. end-of-day DAY-TIF expiry (all DAY orders cancel on bar close)
-            #    (in this minimal single-bar-per-day engine, "end of day" = end of bar)
-            for o in self._orders:
-                # only cancel orders submitted BEFORE this bar — newly submitted
-                # orders should live to the next bar
-                if (
-                    o.status.is_active
-                    and o.time_in_force is TimeInForce.DAY
-                    and o.last_fill_at is None
-                    and o.order_id is not None
-                ):
-                    # heuristic: order was active at start of this bar if it has
-                    # at least one fill or was visible to the matcher already.
-                    # We use a simpler rule: orders just submitted in step 3 retain
-                    # PENDING_WORKING status. We tag them with `_submitted_at_ts`.
-                    pass  # handled implicitly via next-bar matching
+            # 5. end-of-day expiry: DAY orders that have had their one
+            #    matching session (one bar = one day in this engine) and
+            #    are still unfilled cancel at the bar's close. Orders
+            #    submitted during step 4 live on to the next bar.
+            self._expire_orders(i, (TimeInForce.DAY,))
 
         equity_curve = pd.Series(
             data=[eq for _, eq in portfolio.equity_history],
@@ -265,6 +276,15 @@ class EventEngine:
     # -----------------------------------------------------------------
     # Internals
     # -----------------------------------------------------------------
+
+    def _expire_orders(self, bar_index: int, tifs: tuple[TimeInForce, ...]) -> None:
+        """Cancel still-active orders of the given TIFs that have already
+        had a matching opportunity (submitted before ``bar_index``)."""
+        for o in self._orders:
+            if not o.status.is_active or o.time_in_force not in tifs:
+                continue
+            if self._submit_bar.get(o.order_id or -1, -1) < bar_index:
+                o.cancel()
 
     def _match_orders_on_bar(self, ts: pd.Timestamp, bar: pd.Series) -> None:
         """Match all working orders against the bar's prices.
@@ -318,12 +338,19 @@ class EventEngine:
                 triggered = (order.side is Side.BUY and high_p >= stop) or (
                     order.side is Side.SELL and low_p <= stop
                 )
-                # behave as LIMIT post-trigger
+                # behave as LIMIT post-trigger, with the same gap
+                # protection as plain LIMITs: a bar that opens through
+                # the stop makes the order live from the open, so it
+                # fills at the better of open/limit; an intrabar trigger
+                # fills at the limit (conservative).
                 if triggered and (
                     (order.side is Side.BUY and low_p <= limit)
                     or (order.side is Side.SELL and high_p >= limit)
                 ):
-                    fill_price = limit
+                    if order.side is Side.BUY:
+                        fill_price = min(limit, open_p) if open_p >= stop else limit
+                    else:
+                        fill_price = max(limit, open_p) if open_p <= stop else limit
 
             if fill_price is None:
                 continue
@@ -347,8 +374,6 @@ class EventEngine:
 
             # LIMIT orders rest in the book → they earn the maker side;
             # MARKET / STOP / STOP_LIMIT cross the spread → taker.
-            from src.oms import Liquidity
-
             liquidity = Liquidity.MAKER if order.order_type is OrderType.LIMIT else Liquidity.TAKER
             order.record_fill(fill_qty, fill_price, when=ts, liquidity=liquidity)
             self.portfolio.record_fill(
