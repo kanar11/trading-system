@@ -121,6 +121,13 @@ def apply_execution_costs(
     have a turnover column (default ``"trade"``) produced by the
     backtest engine.
 
+    Unit conversion: :func:`compute_execution_cost` returns the cost per
+    unit of *notional traded*, while ``strategy_returns`` are expressed
+    as a fraction of *equity*. The per-unit cost is therefore multiplied
+    by the bar's turnover (notional traded as a fraction of equity) —
+    exactly how the engine applies its flat ``transaction_cost``. A tiny
+    rebalance pays proportionally less than a full position flip.
+
     Args:
         df: Backtest output DataFrame.
         config: Execution configuration.
@@ -136,7 +143,9 @@ def apply_execution_costs(
         raise ValueError("DataFrame must contain 'strategy_returns_gross'.")
 
     df = df.copy()
-    df["transaction_cost"] = compute_execution_cost(df[trade_col].to_numpy(), config)
+    turnover = np.abs(df[trade_col].to_numpy(dtype=float))
+    per_unit_cost = np.asarray(compute_execution_cost(turnover, config), dtype=float)
+    df["transaction_cost"] = per_unit_cost * turnover
     df["strategy_returns"] = df["strategy_returns_gross"] - df["transaction_cost"]
     df["equity_curve"] = (1 + df["strategy_returns"]).cumprod()
     return df
