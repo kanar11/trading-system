@@ -30,9 +30,11 @@ class TestStopLoss:
         )
         result = apply_risk_controls(df, config)
 
-        # position should be zeroed at index 2 (6% drop)
-        assert result["scaled_position"].iloc[2] == 0.0
+        # decision on bar 2 (6% drop): the bar keeps its position (no
+        # look-ahead) and the exit executes on the next bar
         assert result["risk_event"].iloc[2] == "stop_loss"
+        assert result["scaled_position"].iloc[2] == 1.0
+        assert result["scaled_position"].iloc[3] == 0.0
 
     def test_no_stop_loss_when_disabled(self):
         prices = [100, 100, 90, 85]
@@ -61,8 +63,10 @@ class TestTakeProfit:
         )
         result = apply_risk_controls(df, config)
 
-        assert result["scaled_position"].iloc[2] == 0.0
+        # decision on bar 2 (+11%), exit executed on bar 3
         assert result["risk_event"].iloc[2] == "take_profit"
+        assert result["scaled_position"].iloc[2] == 1.0
+        assert result["scaled_position"].iloc[3] == 0.0
 
 
 class TestTrailingStop:
@@ -77,9 +81,10 @@ class TestTrailingStop:
         )
         result = apply_risk_controls(df, config)
 
-        # peak is 115, drop to 111 is ~3.5% drawdown
-        assert result["scaled_position"].iloc[4] == 0.0
+        # peak is 115, drop to 111 is ~3.5% drawdown — decided on the last
+        # bar, so only the flag is recorded (no execution bar remains)
         assert result["risk_event"].iloc[4] == "trailing_stop"
+        assert result["scaled_position"].iloc[4] == 1.0
 
 
 class TestMaxPosition:
