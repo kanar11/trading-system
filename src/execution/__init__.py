@@ -1,5 +1,6 @@
 """Realistic execution-cost modelling (spread + market impact)."""
 
+from src.execution.financing import apply_financing, financing_costs
 from src.execution.impact import (
     almgren_chriss_cost,
     almgren_chriss_trajectory,
@@ -26,4 +27,6 @@ __all__ = [
     "execution_vwap",
     "implementation_shortfall",
     "vwap_slippage",
+    "financing_costs",
+    "apply_financing",
 ]
