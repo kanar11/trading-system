@@ -6,6 +6,7 @@ from src.portfolio.analytics import (
     portfolio_volatility,
     risk_contributions,
 )
+from src.portfolio.frontier import EfficientFrontier, efficient_frontier
 from src.portfolio.optimizer import (
     hierarchical_risk_parity_weights,
     max_sharpe_weights,
@@ -32,4 +33,6 @@ __all__ = [
     "risk_contributions",
     "diversification_ratio",
     "effective_number_of_assets",
+    "EfficientFrontier",
+    "efficient_frontier",
 ]
