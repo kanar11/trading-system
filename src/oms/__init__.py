@@ -6,6 +6,7 @@ from src.oms.analytics import (
     portfolio_exposure,
     summarize_fills,
 )
+from src.oms.fees import FeeSchedule, total_commission
 from src.oms.order import (
     Fill,
     IllegalOrderTransition,
@@ -40,4 +41,6 @@ __all__ = [
     "portfolio_exposure",
     "FillSummary",
     "summarize_fills",
+    "FeeSchedule",
+    "total_commission",
 ]
