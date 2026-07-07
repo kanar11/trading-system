@@ -22,6 +22,7 @@ from src.oms.order import (
 )
 from src.oms.portfolio import Portfolio
 from src.oms.position import Position
+from src.oms.rebalance import RebalanceOrder, rebalance_orders
 
 __all__ = [
     "Order",
@@ -43,4 +44,6 @@ __all__ = [
     "summarize_fills",
     "FeeSchedule",
     "total_commission",
+    "RebalanceOrder",
+    "rebalance_orders",
 ]
