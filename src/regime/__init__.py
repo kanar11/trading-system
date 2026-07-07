@@ -14,6 +14,7 @@ from src.regime.hmm import (
 )
 from src.regime.transitions import regime_durations, regime_transition_matrix
 from src.regime.turbulence import financial_turbulence, turbulent_periods
+from src.regime.volatility import VolRegime, realized_volatility, vol_regimes
 
 __all__ = [
     "RegimeConfig",
@@ -28,4 +29,7 @@ __all__ = [
     "regime_durations",
     "financial_turbulence",
     "turbulent_periods",
+    "VolRegime",
+    "realized_volatility",
+    "vol_regimes",
 ]
