@@ -6,6 +6,7 @@ from src.execution.impact import (
     almgren_chriss_trajectory,
     participation_rate_cost,
 )
+from src.execution.schedule import pov_schedule, twap_schedule, vwap_schedule
 from src.execution.slippage import (
     ExecutionConfig,
     apply_execution_costs,
@@ -29,4 +30,7 @@ __all__ = [
     "vwap_slippage",
     "financing_costs",
     "apply_financing",
+    "twap_schedule",
+    "vwap_schedule",
+    "pov_schedule",
 ]
