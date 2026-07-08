@@ -109,6 +109,123 @@ def vortex(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) 
     return pd.DataFrame({"vi_plus": vi_plus, "vi_minus": vi_minus})
 
 
+def kama(
+    series: pd.Series,
+    er_period: int = 10,
+    fast: int = 2,
+    slow: int = 30,
+) -> pd.Series:
+    """Kaufman Adaptive Moving Average (Kaufman, 1995).
+
+    An EMA whose smoothing constant adapts to the Efficiency Ratio
+    ``ER = |net change| / sum(|bar changes|)`` over ``er_period`` bars:
+    in a clean trend (ER → 1) it moves as fast as an EMA(``fast``), in
+    choppy noise (ER → 0) it flattens toward an EMA(``slow``)::
+
+        SC = (ER * (2/(fast+1) - 2/(slow+1)) + 2/(slow+1))²
+        KAMA_t = KAMA_{t-1} + SC_t * (price_t - KAMA_{t-1})
+
+    The recursion is seeded with the price at the first bar with a valid
+    ER; earlier bars are NaN. A perfectly flat window (zero volatility)
+    gets ER = 0, i.e. the slowest smoothing.
+
+    Raises:
+        ValueError: If ``er_period`` < 1 or not ``1 <= fast < slow``.
+    """
+    if er_period < 1:
+        raise ValueError(f"er_period must be >= 1, got {er_period}.")
+    if not 1 <= fast < slow:
+        raise ValueError(f"need 1 <= fast < slow, got fast={fast}, slow={slow}.")
+
+    prices = series.to_numpy(dtype=float)
+    n = len(prices)
+    out = np.full(n, np.nan)
+    if n > er_period:
+        change = np.abs(series.diff(er_period).to_numpy(dtype=float))
+        volatility = series.diff().abs().rolling(er_period, min_periods=er_period).sum()
+        vol = volatility.to_numpy(dtype=float)
+        er = np.divide(change, vol, out=np.zeros(n), where=vol > 0)
+
+        fast_sc = 2.0 / (fast + 1)
+        slow_sc = 2.0 / (slow + 1)
+        sc = (er * (fast_sc - slow_sc) + slow_sc) ** 2
+
+        out[er_period] = prices[er_period]
+        for i in range(er_period + 1, n):
+            out[i] = out[i - 1] + sc[i] * (prices[i] - out[i - 1])
+    return pd.Series(out, index=series.index)
+
+
+def parabolic_sar(
+    high: pd.Series,
+    low: pd.Series,
+    af_step: float = 0.02,
+    af_max: float = 0.20,
+) -> pd.DataFrame:
+    """Parabolic Stop-and-Reverse (Wilder, 1978).
+
+    A trailing stop that accelerates toward price: while a trend runs, the
+    SAR moves toward it by an acceleration factor ``af`` that starts at
+    ``af_step``, grows by ``af_step`` on every new extreme, and caps at
+    ``af_max``; the SAR is also never placed inside the previous two bars'
+    range. When price crosses the SAR the position stops *and reverses*:
+    the SAR jumps to the old extreme point and the trend flips.
+
+    Returns a DataFrame with columns:
+        * ``sar``   — the stop level (below price in up-trends, above in
+          down-trends). The first bar is NaN (no prior trend).
+        * ``trend`` — +1 (up) / -1 (down); 0 on the seed bar.
+
+    Raises:
+        ValueError: If not ``0 < af_step <= af_max``.
+    """
+    if not 0 < af_step <= af_max:
+        raise ValueError(f"need 0 < af_step <= af_max, got {af_step} and {af_max}.")
+
+    highs = high.to_numpy(dtype=float)
+    lows = low.to_numpy(dtype=float)
+    n = len(highs)
+    sar = np.full(n, np.nan)
+    trend = np.zeros(n, dtype=int)
+    if n < 2:
+        return pd.DataFrame({"sar": sar, "trend": trend}, index=high.index)
+
+    # seed from the first two bars: rising highs start an up-trend
+    up = highs[1] >= highs[0]
+    sar[1] = lows[0] if up else highs[0]
+    extreme = highs[1] if up else lows[1]
+    af = af_step
+    trend[1] = 1 if up else -1
+
+    for i in range(2, n):
+        next_sar = sar[i - 1] + af * (extreme - sar[i - 1])
+        if up:
+            # never place the SAR inside the previous two bars' lows
+            next_sar = min(next_sar, lows[i - 1], lows[i - 2])
+            if lows[i] < next_sar:  # stopped out -> reverse down
+                up = False
+                next_sar = extreme
+                extreme = lows[i]
+                af = af_step
+            elif highs[i] > extreme:  # new extreme -> accelerate
+                extreme = highs[i]
+                af = min(af + af_step, af_max)
+        else:
+            next_sar = max(next_sar, highs[i - 1], highs[i - 2])
+            if highs[i] > next_sar:  # stopped out -> reverse up
+                up = True
+                next_sar = extreme
+                extreme = highs[i]
+                af = af_step
+            elif lows[i] < extreme:
+                extreme = lows[i]
+                af = min(af + af_step, af_max)
+        sar[i] = next_sar
+        trend[i] = 1 if up else -1
+
+    return pd.DataFrame({"sar": sar, "trend": trend}, index=high.index)
+
+
 def ichimoku(
     high: pd.Series,
     low: pd.Series,

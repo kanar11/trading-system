@@ -28,7 +28,18 @@ from src.indicators.momentum import (
     trix,
     williams_r,
 )
-from src.indicators.trend import aroon, ema, hma, ichimoku, sma, vortex, vwma, wma
+from src.indicators.trend import (
+    aroon,
+    ema,
+    hma,
+    ichimoku,
+    kama,
+    parabolic_sar,
+    sma,
+    vortex,
+    vwma,
+    wma,
+)
 from src.indicators.volatility import (
     atr,
     bollinger,
@@ -49,6 +60,8 @@ __all__ = [
     "aroon",
     "vortex",
     "ichimoku",
+    "kama",
+    "parabolic_sar",
     # momentum
     "rsi",
     "macd",
