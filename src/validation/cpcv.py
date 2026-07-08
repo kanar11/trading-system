@@ -101,6 +101,40 @@ def combinatorial_purged_splits(
     return splits
 
 
+def assemble_backtest_paths(n_groups: int = 6, n_test_groups: int = 2) -> np.ndarray:
+    """Assign every CPCV test forecast to one of the φ backtest paths.
+
+    Across the C(N, k) splits of :func:`combinatorial_purged_splits`, each
+    group is a test group exactly φ = C(N−1, k−1) times. Those appearances
+    can be woven into φ complete out-of-sample paths: path ``j`` takes each
+    group's forecasts from the ``j``-th split (in combination order) that
+    tested it. Every (split, test-group) pair is consumed exactly once, so
+    the C(N, k) split results reassemble into φ full equity paths — the
+    input distribution for PBO-style overfit diagnostics.
+
+    Args:
+        n_groups: Number of contiguous blocks N (>= 2).
+        n_test_groups: Test blocks per split k (1 <= k < N).
+
+    Returns:
+        Integer array of shape ``(φ, n_groups)``: entry ``[j, g]`` is the
+        index (into the split list) of the split whose test set supplies
+        group ``g``'s forecasts on path ``j``.
+
+    Raises:
+        ValueError: If the group counts are out of range.
+    """
+    _validate_groups(n_groups, n_test_groups)
+    phi = math.comb(n_groups - 1, n_test_groups - 1)
+    paths = np.empty((phi, n_groups), dtype=int)
+    appearances = [0] * n_groups
+    for split_idx, combo in enumerate(combinations(range(n_groups), n_test_groups)):
+        for g in combo:
+            paths[appearances[g], g] = split_idx
+            appearances[g] += 1
+    return paths
+
+
 def _validate_groups(n_groups: int, n_test_groups: int) -> None:
     """Shared range checks for the CPCV group parameters."""
     if n_groups < 2:
