@@ -6,6 +6,7 @@ from src.oms.analytics import (
     portfolio_exposure,
     summarize_fills,
 )
+from src.oms.checks import CheckResult, PreTradeLimits, pre_trade_check
 from src.oms.fees import FeeSchedule, total_commission
 from src.oms.order import (
     Fill,
@@ -46,4 +47,7 @@ __all__ = [
     "total_commission",
     "RebalanceOrder",
     "rebalance_orders",
+    "PreTradeLimits",
+    "CheckResult",
+    "pre_trade_check",
 ]
