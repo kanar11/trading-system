@@ -19,6 +19,7 @@ from src.portfolio.portfolio import (
     PortfolioResult,
     run_portfolio_backtest,
 )
+from src.portfolio.shrinkage import ShrinkageResult, ledoit_wolf_covariance
 
 __all__ = [
     "PortfolioConfig",
@@ -35,4 +36,6 @@ __all__ = [
     "effective_number_of_assets",
     "EfficientFrontier",
     "efficient_frontier",
+    "ShrinkageResult",
+    "ledoit_wolf_covariance",
 ]
