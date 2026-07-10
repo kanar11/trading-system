@@ -6,6 +6,7 @@ from src.portfolio.analytics import (
     portfolio_volatility,
     risk_contributions,
 )
+from src.portfolio.black_litterman import BlackLittermanResult, black_litterman
 from src.portfolio.frontier import EfficientFrontier, efficient_frontier
 from src.portfolio.optimizer import (
     hierarchical_risk_parity_weights,
@@ -38,4 +39,6 @@ __all__ = [
     "efficient_frontier",
     "ShrinkageResult",
     "ledoit_wolf_covariance",
+    "BlackLittermanResult",
+    "black_litterman",
 ]
