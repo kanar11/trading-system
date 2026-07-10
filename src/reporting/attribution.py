@@ -236,3 +236,48 @@ def capture_ratio(strategy_returns: pd.Series, benchmark_returns: pd.Series) -> 
     if down == 0:
         return float("inf") if up > 0 else 0.0
     return up / down
+
+
+def rolling_alpha_beta(
+    strategy_returns: pd.Series,
+    benchmark_returns: pd.Series,
+    window: int = 63,
+    periods_per_year: int = 252,
+) -> pd.DataFrame:
+    """Rolling single-factor alpha and beta vs a benchmark.
+
+    :func:`compute_beta` / :func:`factor_regression` give one full-sample
+    number; this is the tearsheet's time-varying view — per bar, the OLS
+    fit over the trailing ``window``::
+
+        beta_t  = Cov(r_s, r_b) / Var(r_b)          (trailing window, ddof=1)
+        alpha_t = (mean(r_s) - beta_t * mean(r_b)) * periods_per_year
+
+    Args:
+        strategy_returns: Per-bar strategy returns.
+        benchmark_returns: Per-bar benchmark returns on the same index.
+        window: Trailing OLS window (>= 2).
+        periods_per_year: Bars per year for annualising the intercept.
+
+    Returns:
+        DataFrame with ``alpha`` (annualised) and ``beta`` columns; the
+        warm-up and any window with zero benchmark variance are NaN.
+
+    Raises:
+        ValueError: If the indexes differ, ``window`` < 2 or
+            ``periods_per_year`` < 1.
+    """
+    if not strategy_returns.index.equals(benchmark_returns.index):
+        raise ValueError("strategy and benchmark returns must share the same index.")
+    if window < 2:
+        raise ValueError(f"window must be >= 2, got {window}.")
+    if periods_per_year < 1:
+        raise ValueError(f"periods_per_year must be >= 1, got {periods_per_year}.")
+
+    cov = strategy_returns.rolling(window).cov(benchmark_returns)
+    var = benchmark_returns.rolling(window).var(ddof=1)
+    beta = (cov / var).replace([np.inf, -np.inf], np.nan)
+    alpha = (
+        strategy_returns.rolling(window).mean() - beta * benchmark_returns.rolling(window).mean()
+    ) * periods_per_year
+    return pd.DataFrame({"alpha": alpha, "beta": beta})
