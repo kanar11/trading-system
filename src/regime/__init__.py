@@ -1,5 +1,6 @@
 """Market regime detection and adaptive strategy selection."""
 
+from src.regime.conditional import regime_performance
 from src.regime.detector import (
     RegimeConfig,
     RegimeType,
@@ -32,4 +33,5 @@ __all__ = [
     "VolRegime",
     "realized_volatility",
     "vol_regimes",
+    "regime_performance",
 ]
