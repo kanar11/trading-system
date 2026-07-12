@@ -24,6 +24,8 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from src.risk.metrics import rolling_beta
+
 logger = logging.getLogger(__name__)
 
 TRADING_DAYS = 252
@@ -274,9 +276,9 @@ def rolling_alpha_beta(
     if periods_per_year < 1:
         raise ValueError(f"periods_per_year must be >= 1, got {periods_per_year}.")
 
-    cov = strategy_returns.rolling(window).cov(benchmark_returns)
-    var = benchmark_returns.rolling(window).var(ddof=1)
-    beta = (cov / var).replace([np.inf, -np.inf], np.nan)
+    # single source of truth for the rolling OLS beta lives in risk.metrics;
+    # with identical indexes (validated above) its inner join is a no-op
+    beta = rolling_beta(strategy_returns, benchmark_returns, window=window)
     alpha = (
         strategy_returns.rolling(window).mean() - beta * benchmark_returns.rolling(window).mean()
     ) * periods_per_year
