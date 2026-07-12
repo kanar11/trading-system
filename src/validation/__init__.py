@@ -8,6 +8,7 @@ from src.validation.cpcv import (
 from src.validation.pbo import PBOResult, probability_of_backtest_overfitting
 from src.validation.purged_cv import purged_kfold_splits
 from src.validation.reality_check import RealityCheckResult, whites_reality_check
+from src.validation.spa import SPAResult, hansen_spa
 from src.validation.timing import TimingTestResult, henriksson_merton, treynor_mazuy
 from src.validation.walk_forward import (
     FoldResult,
@@ -32,4 +33,6 @@ __all__ = [
     "TimingTestResult",
     "treynor_mazuy",
     "henriksson_merton",
+    "SPAResult",
+    "hansen_spa",
 ]
