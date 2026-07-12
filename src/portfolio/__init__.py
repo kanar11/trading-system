@@ -21,6 +21,7 @@ from src.portfolio.portfolio import (
     run_portfolio_backtest,
 )
 from src.portfolio.shrinkage import ShrinkageResult, ledoit_wolf_covariance
+from src.portfolio.turnover import constrain_turnover, portfolio_turnover
 
 __all__ = [
     "PortfolioConfig",
@@ -41,4 +42,6 @@ __all__ = [
     "ledoit_wolf_covariance",
     "BlackLittermanResult",
     "black_litterman",
+    "portfolio_turnover",
+    "constrain_turnover",
 ]
