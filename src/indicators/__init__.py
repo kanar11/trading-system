@@ -20,7 +20,9 @@ pandas. Functions are pure (no in-place mutation of inputs).
 from src.indicators.momentum import (
     cci,
     cmo,
+    distance_from_high,
     elder_ray,
+    lookback_return,
     macd,
     roc,
     rsi,
@@ -72,6 +74,8 @@ __all__ = [
     "trix",
     "cmo",
     "elder_ray",
+    "lookback_return",
+    "distance_from_high",
     # volatility
     "atr",
     "bollinger",

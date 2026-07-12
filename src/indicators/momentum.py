@@ -145,3 +145,43 @@ def elder_ray(
         raise ValueError(f"period must be >= 1, got {period}.")
     baseline = ema(close, period)
     return pd.DataFrame({"bull_power": high - baseline, "bear_power": low - baseline})
+
+
+def lookback_return(close: pd.Series, lookback: int = 252, skip: int = 21) -> pd.Series:
+    """Skip-month momentum score (the industry "12-1" convention).
+
+    The cross-sectional and time-series momentum literature (Jegadeesh &
+    Titman 1993; Moskowitz, Ooi & Pedersen 2012) measures momentum as the
+    return over the past ``lookback`` bars *excluding* the most recent
+    ``skip`` bars, side-stepping the well-documented 1-month short-term
+    reversal::
+
+        score_t = close[t - skip] / close[t - lookback] - 1
+
+    With the defaults (252, 21) this is the classic 12-1 month score on
+    daily bars; ``skip=0`` gives the plain trailing return (like
+    :func:`roc` but expressed as a fraction, not a percentage).
+
+    Raises:
+        ValueError: If ``skip`` < 0 or ``lookback`` <= ``skip``.
+    """
+    if skip < 0:
+        raise ValueError(f"skip must be >= 0, got {skip}.")
+    if lookback <= skip:
+        raise ValueError(f"lookback ({lookback}) must be > skip ({skip}).")
+    return close.shift(skip) / close.shift(lookback) - 1
+
+
+def distance_from_high(close: pd.Series, window: int = 252) -> pd.Series:
+    """Fractional distance below the rolling ``window`` high (<= 0).
+
+    George & Hwang (2004) show proximity to the 52-week high is itself a
+    momentum signal: ``close / rolling_max(close) - 1`` is 0 at a fresh
+    high and increasingly negative the further price sits below it.
+
+    Raises:
+        ValueError: If ``window`` < 1.
+    """
+    if window < 1:
+        raise ValueError(f"window must be >= 1, got {window}.")
+    return close / close.rolling(window, min_periods=window).max() - 1
