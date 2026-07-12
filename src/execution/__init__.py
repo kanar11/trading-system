@@ -1,5 +1,6 @@
 """Realistic execution-cost modelling (spread + market impact)."""
 
+from src.execution.fills import simulate_limit_fills
 from src.execution.financing import apply_financing, financing_costs
 from src.execution.impact import (
     almgren_chriss_cost,
@@ -33,4 +34,5 @@ __all__ = [
     "twap_schedule",
     "vwap_schedule",
     "pov_schedule",
+    "simulate_limit_fills",
 ]
