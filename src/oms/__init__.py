@@ -8,6 +8,7 @@ from src.oms.analytics import (
 )
 from src.oms.checks import CheckResult, PreTradeLimits, pre_trade_check
 from src.oms.fees import FeeSchedule, total_commission
+from src.oms.margin import MarginReport, MarginRequirements, margin_report
 from src.oms.order import (
     Fill,
     IllegalOrderTransition,
@@ -50,4 +51,7 @@ __all__ = [
     "PreTradeLimits",
     "CheckResult",
     "pre_trade_check",
+    "MarginRequirements",
+    "MarginReport",
+    "margin_report",
 ]
