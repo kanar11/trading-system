@@ -14,7 +14,12 @@ from src.regime.hmm import (
     fit_gaussian_hmm,
 )
 from src.regime.market_states import BEAR, BULL, bull_bear_labels
-from src.regime.transitions import regime_durations, regime_transition_matrix
+from src.regime.transitions import (
+    forecast_regime_probabilities,
+    regime_durations,
+    regime_transition_matrix,
+    stationary_distribution,
+)
 from src.regime.turbulence import financial_turbulence, turbulent_periods
 from src.regime.volatility import VolRegime, realized_volatility, vol_regimes
 
@@ -29,6 +34,8 @@ __all__ = [
     "fit_gaussian_hmm",
     "regime_transition_matrix",
     "regime_durations",
+    "stationary_distribution",
+    "forecast_regime_probabilities",
     "financial_turbulence",
     "turbulent_periods",
     "VolRegime",

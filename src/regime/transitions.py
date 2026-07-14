@@ -39,6 +39,91 @@ def regime_transition_matrix(regimes: pd.Series) -> pd.DataFrame:
     return probs
 
 
+def _validated_matrix(transition_matrix: pd.DataFrame) -> np.ndarray:
+    """Require a square, row-stochastic matrix and return it as ndarray."""
+    matrix = transition_matrix.to_numpy(dtype=float)
+    n = matrix.shape[0]
+    if matrix.ndim != 2 or matrix.shape != (n, n) or n == 0:
+        raise ValueError(f"transition matrix must be square and non-empty, got {matrix.shape}.")
+    if list(transition_matrix.index) != list(transition_matrix.columns):
+        raise ValueError("transition matrix must have identical row and column labels.")
+    if (matrix < 0).any() or np.isnan(matrix).any():
+        raise ValueError("transition probabilities must be non-negative and NaN-free.")
+    if not np.allclose(matrix.sum(axis=1), 1.0, atol=1e-8):
+        raise ValueError("every row of the transition matrix must sum to 1.")
+    return matrix
+
+
+def stationary_distribution(transition_matrix: pd.DataFrame) -> pd.Series:
+    """Long-run regime probabilities of a Markov transition matrix.
+
+    Solves ``π P = π`` with ``Σπ = 1`` — the left eigenvector of ``P`` for
+    eigenvalue 1. This is the fraction of time the chain spends in each
+    regime once transients die out; for the empirical matrix of
+    :func:`regime_transition_matrix` it should approximate the observed
+    label frequencies on a long sample.
+
+    Args:
+        transition_matrix: Row-stochastic P(to | from), e.g. the output of
+            :func:`regime_transition_matrix` (rows must each sum to 1).
+
+    Returns:
+        Probability Series named ``"stationary"`` indexed by regime label.
+
+    Raises:
+        ValueError: If the matrix is not square/row-stochastic or its
+            labels are inconsistent.
+    """
+    matrix = _validated_matrix(transition_matrix)
+    eigenvalues, eigenvectors = np.linalg.eig(matrix.T)
+    closest = int(np.argmin(np.abs(eigenvalues - 1.0)))
+    pi = np.real(eigenvectors[:, closest])
+    pi = np.abs(pi)
+    pi = pi / pi.sum()
+    return pd.Series(pi, index=transition_matrix.index, name="stationary")
+
+
+def forecast_regime_probabilities(
+    transition_matrix: pd.DataFrame,
+    current: pd.Series | str | int,
+    steps: int = 1,
+) -> pd.Series:
+    """Regime probabilities ``steps`` bars ahead: ``p_0 Pᵏ``.
+
+    Args:
+        transition_matrix: Row-stochastic P(to | from) with matching labels.
+        current: Either a regime label (point mass on that state) or a
+            probability Series over the matrix labels.
+        steps: Forecast horizon in bars (>= 0; 0 returns the start
+            distribution).
+
+    Returns:
+        Probability Series named ``"forecast"`` indexed by regime label.
+
+    Raises:
+        ValueError: If the matrix is invalid, ``steps`` < 0, the label is
+            unknown, or a start distribution is misaligned/not a
+            probability vector.
+    """
+    matrix = _validated_matrix(transition_matrix)
+    if steps < 0:
+        raise ValueError(f"steps must be >= 0, got {steps}.")
+
+    labels = list(transition_matrix.index)
+    if isinstance(current, pd.Series):
+        start = current.reindex(labels).to_numpy(dtype=float)
+        if np.isnan(start).any() or (start < 0).any() or not np.isclose(start.sum(), 1.0):
+            raise ValueError("current must be a probability vector over the matrix labels.")
+    else:
+        if current not in labels:
+            raise ValueError(f"unknown regime label {current!r}; expected one of {labels}.")
+        start = np.zeros(len(labels))
+        start[labels.index(current)] = 1.0
+
+    forecast = start @ np.linalg.matrix_power(matrix, steps)
+    return pd.Series(forecast, index=transition_matrix.index, name="forecast")
+
+
 def regime_durations(regimes: pd.Series) -> pd.Series:
     """Average consecutive dwell time (in bars) per regime.
 
