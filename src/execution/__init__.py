@@ -13,6 +13,12 @@ from src.execution.slippage import (
     apply_execution_costs,
     compute_execution_cost,
 )
+from src.execution.spreads import (
+    effective_spread,
+    price_impact,
+    quoted_spread,
+    realized_spread,
+)
 from src.execution.tca import (
     execution_vwap,
     implementation_shortfall,
@@ -35,4 +41,8 @@ __all__ = [
     "vwap_schedule",
     "pov_schedule",
     "simulate_limit_fills",
+    "quoted_spread",
+    "effective_spread",
+    "realized_spread",
+    "price_impact",
 ]
