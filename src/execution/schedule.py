@@ -101,6 +101,52 @@ def vwap_schedule(
     return _wrap_like(children, volume_profile)
 
 
+def iceberg_schedule(
+    total_quantity: float,
+    display_size: float,
+    jitter: float = 0.0,
+    seed: int | None = None,
+) -> np.ndarray:
+    """Slice a parent order into iceberg clips of roughly ``display_size``.
+
+    An iceberg shows only a small clip of the parent at a time; once a
+    clip fills, the next is exposed. Constant clip sizes are trivially
+    detectable, so desks randomise them — with ``jitter`` each clip is
+    drawn uniformly from ``display_size · [1 − jitter, 1 + jitter]``
+    (deterministically under ``seed``). The final clip absorbs whatever
+    remains, so the clips always sum to the parent exactly.
+
+    Args:
+        total_quantity: Parent order size (>= 0, sign-free).
+        display_size: Nominal visible clip size (> 0).
+        jitter: Clip-size randomisation as a fraction in [0, 1).
+        seed: RNG seed for reproducible randomised schedules.
+
+    Returns:
+        Array of clip quantities (empty for a zero parent), each positive,
+        summing to ``total_quantity``.
+
+    Raises:
+        ValueError: If ``total_quantity`` < 0, ``display_size`` <= 0 or
+            ``jitter`` is outside [0, 1).
+    """
+    _validate_total(total_quantity)
+    if display_size <= 0:
+        raise ValueError(f"display_size must be > 0, got {display_size}.")
+    if not 0.0 <= jitter < 1.0:
+        raise ValueError(f"jitter must be in [0, 1), got {jitter}.")
+
+    rng = np.random.default_rng(seed)
+    clips: list[float] = []
+    remaining = float(total_quantity)
+    while remaining > 0:
+        clip = display_size if jitter == 0 else display_size * (1.0 + rng.uniform(-jitter, jitter))
+        clip = min(clip, remaining)
+        clips.append(clip)
+        remaining -= clip
+    return np.asarray(clips)
+
+
 def pov_schedule(
     total_quantity: float,
     volume_profile: pd.Series | np.ndarray | list[float],

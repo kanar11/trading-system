@@ -7,7 +7,12 @@ from src.execution.impact import (
     almgren_chriss_trajectory,
     participation_rate_cost,
 )
-from src.execution.schedule import pov_schedule, twap_schedule, vwap_schedule
+from src.execution.schedule import (
+    iceberg_schedule,
+    pov_schedule,
+    twap_schedule,
+    vwap_schedule,
+)
 from src.execution.slippage import (
     ExecutionConfig,
     apply_execution_costs,
@@ -40,6 +45,7 @@ __all__ = [
     "twap_schedule",
     "vwap_schedule",
     "pov_schedule",
+    "iceberg_schedule",
     "simulate_limit_fills",
     "quoted_spread",
     "effective_spread",
