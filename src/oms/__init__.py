@@ -1,5 +1,6 @@
 """Order management, position tracking, portfolio state."""
 
+from src.oms.allocation import pro_rata_allocation
 from src.oms.analytics import (
     ExposureReport,
     FillSummary,
@@ -54,4 +55,5 @@ __all__ = [
     "MarginRequirements",
     "MarginReport",
     "margin_report",
+    "pro_rata_allocation",
 ]
