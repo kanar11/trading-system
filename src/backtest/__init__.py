@@ -5,6 +5,10 @@ from src.backtest.engine import backtest_strategy
 from src.backtest.exposure import ExposureSummary, summarize_exposure
 from src.backtest.robustness import lag_sensitivity
 from src.backtest.trades import TradeStats, trade_statistics
+from src.backtest.walk_forward_weights import (
+    WalkForwardWeightsResult,
+    walk_forward_weights,
+)
 from src.backtest.weights import backtest_weights
 
 __all__ = [
@@ -17,4 +21,6 @@ __all__ = [
     "trade_statistics",
     "backtest_weights",
     "lag_sensitivity",
+    "WalkForwardWeightsResult",
+    "walk_forward_weights",
 ]
