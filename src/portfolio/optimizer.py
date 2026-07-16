@@ -174,8 +174,14 @@ def risk_parity_weights(
     Σ = _covariance_matrix(returns, cov)
     n = Σ.shape[0]
     b = np.full(n, 1.0 / n)  # equal risk budget per asset
-    w = np.full(n, 1.0 / n)
+    w = _budget_descent(Σ, b, max_iter, tol)
+    return pd.Series(w, index=returns.columns, name="risk_parity")
 
+
+def _budget_descent(Σ: np.ndarray, b: np.ndarray, max_iter: int, tol: float) -> np.ndarray:
+    """Cyclical coordinate descent for risk-budget weights (see above)."""
+    n = Σ.shape[0]
+    w = np.full(n, 1.0 / n)
     for _ in range(max_iter):
         w_prev = w.copy()
         for i in range(n):
@@ -186,9 +192,51 @@ def risk_parity_weights(
             w[i] = (-m + float(np.sqrt(disc))) / (2 * a)
         if np.abs(w - w_prev).sum() < tol:
             break
+    return w / float(w.sum())
 
-    w = w / w.sum()
-    return pd.Series(w, index=returns.columns, name="risk_parity")
+
+def risk_budget_weights(
+    returns: pd.DataFrame,
+    budgets: pd.Series | dict[str, float],
+    cov: pd.DataFrame | np.ndarray | None = None,
+    max_iter: int = 500,
+    tol: float = 1e-8,
+) -> pd.Series:
+    """Weights whose risk contributions match arbitrary budgets.
+
+    The generalisation of :func:`risk_parity_weights` (which is the equal
+    budget ``b_i = 1/n`` special case): solve for ``w`` such that each
+    asset's contribution to portfolio variance, ``w_i (Σw)_i``, is
+    proportional to its budget ``b_i`` — the standard risk-budgeting
+    formulation of Maillard, Roncalli & Teïletche (2010), solved with the
+    same globally convergent cyclical coordinate descent.
+
+    Args:
+        returns: DataFrame of asset returns (columns = tickers).
+        budgets: ``{ticker: budget}`` covering every column; strictly
+            positive (normalised to sum to 1 internally).
+        cov: Optional pre-computed covariance matrix.
+        max_iter: Iteration cap.
+        tol: Convergence tolerance on the weight L1 change.
+
+    Returns:
+        Series of long-only weights indexed by ticker, summing to 1.
+
+    Raises:
+        ValueError: If a budget is missing, non-finite or not > 0.
+    """
+    Σ = _covariance_matrix(returns, cov)
+    provided = dict(budgets)
+    missing = [t for t in returns.columns if t not in provided]
+    if missing:
+        raise ValueError(f"budgets missing tickers {missing}.")
+    b = pd.Series(provided).reindex(returns.columns).to_numpy(dtype=float)
+    if not np.isfinite(b).all() or (b <= 0).any():
+        raise ValueError("budgets must be finite and > 0 for every ticker.")
+    b = b / b.sum()
+
+    w = _budget_descent(Σ, b, max_iter, tol)
+    return pd.Series(w, index=returns.columns, name="risk_budget")
 
 
 def maximum_diversification_weights(

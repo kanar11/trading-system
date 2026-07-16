@@ -13,6 +13,7 @@ from src.portfolio.optimizer import (
     max_sharpe_weights,
     maximum_diversification_weights,
     min_variance_weights,
+    risk_budget_weights,
     risk_parity_weights,
 )
 from src.portfolio.portfolio import (
@@ -44,4 +45,5 @@ __all__ = [
     "black_litterman",
     "portfolio_turnover",
     "constrain_turnover",
+    "risk_budget_weights",
 ]
