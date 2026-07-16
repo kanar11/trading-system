@@ -31,6 +31,7 @@ from src.indicators.momentum import (
     williams_r,
 )
 from src.indicators.trend import (
+    adx,
     aroon,
     ema,
     hma,
@@ -64,6 +65,7 @@ __all__ = [
     "ichimoku",
     "kama",
     "parabolic_sar",
+    "adx",
     # momentum
     "rsi",
     "macd",

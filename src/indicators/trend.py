@@ -109,6 +109,59 @@ def vortex(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) 
     return pd.DataFrame({"vi_plus": vi_plus, "vi_minus": vi_minus})
 
 
+def adx(
+    high: pd.Series,
+    low: pd.Series,
+    close: pd.Series,
+    period: int = 14,
+) -> pd.DataFrame:
+    """Average Directional Index with the +DI / -DI directional lines.
+
+    Wilder's trend-strength system: directional movement (+DM/-DM, the
+    larger one-sided range extension) is smoothed and normalised by ATR
+    into the directional indicators, whose normalised spread smooths into
+    ADX. Readings above ~25 mark a strong trend; the DI crossover gives
+    its direction. Uses Wilder's smoothing (``ewm(alpha=1/period)``),
+    matching the private implementation the regime detector has used all
+    along — this is the public, reusable form.
+
+    Returns a DataFrame with columns:
+        * ``adx``      — trend strength in [0, 100].
+        * ``di_plus``  — positive directional indicator.
+        * ``di_minus`` — negative directional indicator.
+
+    Raises:
+        ValueError: If ``period`` < 1.
+    """
+    if period < 1:
+        raise ValueError(f"period must be >= 1, got {period}.")
+
+    up_move = high.diff()
+    down_move = -low.diff()
+    plus_dm = up_move.where((up_move > down_move) & (up_move > 0), 0.0)
+    minus_dm = down_move.where((down_move > up_move) & (down_move > 0), 0.0)
+
+    # true range inline: trend.py must not import from volatility.py (cycle)
+    prev_close = close.shift(1)
+    true_range = pd.concat(
+        [high - low, (high - prev_close).abs(), (low - prev_close).abs()], axis=1
+    ).max(axis=1)
+
+    atr = true_range.ewm(alpha=1 / period, min_periods=period).mean()
+    # DM <= TR bar by bar, so the DIs are mathematically bounded by 100;
+    # the clip only removes smoothing float dust above the bound
+    di_plus = (100 * plus_dm.ewm(alpha=1 / period, min_periods=period).mean() / atr).clip(
+        upper=100.0
+    )
+    di_minus = (100 * minus_dm.ewm(alpha=1 / period, min_periods=period).mean() / atr).clip(
+        upper=100.0
+    )
+
+    dx = 100 * (di_plus - di_minus).abs() / (di_plus + di_minus).replace(0, np.nan)
+    strength = dx.ewm(alpha=1 / period, min_periods=period).mean().clip(upper=100.0)
+    return pd.DataFrame({"adx": strength, "di_plus": di_plus, "di_minus": di_minus})
+
+
 def kama(
     series: pd.Series,
     er_period: int = 10,
