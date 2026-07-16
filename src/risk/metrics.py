@@ -90,6 +90,43 @@ def parametric_var(returns: pd.Series, level: float = 0.05) -> float:
     return float(-(mu + z * sigma))
 
 
+def cornish_fisher_var(returns: pd.Series, level: float = 0.05) -> float:
+    """Modified (Cornish-Fisher) VaR at ``level``.
+
+    Gaussian VaR ignores exactly what makes financial returns dangerous:
+    skew and fat tails. The Cornish-Fisher expansion adjusts the normal
+    quantile with the sample's higher moments (S = skewness, K = excess
+    kurtosis)::
+
+        z_cf = z + (z² − 1)·S/6 + (z³ − 3z)·K/24 − (2z³ − 5z)·S²/36
+
+    so negatively skewed / leptokurtic series get a larger loss estimate
+    than :func:`parametric_var` — the "modified VaR" standard popularised
+    by Favre & Galeano (2002). Positive-loss convention as for the rest
+    of the VaR family; falls back to 0.0 below 4 observations.
+    """
+    if not 0 < level < 1:
+        raise ValueError("level must be in (0, 1)")
+    r = pd.Series(returns).dropna()
+    if len(r) < 4:
+        return 0.0
+    mu = float(r.mean())
+    sigma = float(r.std(ddof=1))
+
+    from src.validation.stat_tests import _norm_quantile
+
+    z = _norm_quantile(level)
+    skew = skewness(r)
+    excess = kurtosis(r)
+    z_cf = (
+        z
+        + (z**2 - 1) * skew / 6.0
+        + (z**3 - 3 * z) * excess / 24.0
+        - (2 * z**3 - 5 * z) * skew**2 / 36.0
+    )
+    return float(-(mu + z_cf * sigma))
+
+
 # ---------------------------------------------------------------------------
 # Tail-shape / drawdown metrics
 # ---------------------------------------------------------------------------
