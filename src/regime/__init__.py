@@ -13,6 +13,7 @@ from src.regime.hmm import (
     detect_hmm_regime,
     fit_gaussian_hmm,
 )
+from src.regime.hmm_filter import filter_hmm_probabilities, filtered_hmm_states
 from src.regime.market_states import BEAR, BULL, bull_bear_labels
 from src.regime.transitions import (
     forecast_regime_probabilities,
@@ -45,4 +46,6 @@ __all__ = [
     "BULL",
     "BEAR",
     "bull_bear_labels",
+    "filter_hmm_probabilities",
+    "filtered_hmm_states",
 ]
