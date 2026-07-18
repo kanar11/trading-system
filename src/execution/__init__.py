@@ -7,6 +7,7 @@ from src.execution.impact import (
     almgren_chriss_trajectory,
     participation_rate_cost,
 )
+from src.execution.queue_model import simulate_queue_fill
 from src.execution.schedule import (
     iceberg_schedule,
     pov_schedule,
@@ -47,6 +48,7 @@ __all__ = [
     "pov_schedule",
     "iceberg_schedule",
     "simulate_limit_fills",
+    "simulate_queue_fill",
     "quoted_spread",
     "effective_spread",
     "realized_spread",
