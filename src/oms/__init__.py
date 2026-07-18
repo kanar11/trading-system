@@ -8,6 +8,7 @@ from src.oms.analytics import (
     summarize_fills,
 )
 from src.oms.checks import CheckResult, PreTradeLimits, pre_trade_check
+from src.oms.corporate import apply_dividend, apply_split
 from src.oms.fees import FeeSchedule, total_commission
 from src.oms.margin import MarginReport, MarginRequirements, margin_report
 from src.oms.order import (
@@ -56,4 +57,6 @@ __all__ = [
     "MarginReport",
     "margin_report",
     "pro_rata_allocation",
+    "apply_split",
+    "apply_dividend",
 ]
