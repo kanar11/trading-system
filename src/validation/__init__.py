@@ -2,6 +2,7 @@
 
 from src.validation.cpcv import (
     assemble_backtest_paths,
+    assemble_path_returns,
     combinatorial_purged_splits,
     n_backtest_paths,
 )
@@ -28,6 +29,7 @@ __all__ = [
     "combinatorial_purged_splits",
     "n_backtest_paths",
     "assemble_backtest_paths",
+    "assemble_path_returns",
     "RealityCheckResult",
     "whites_reality_check",
     "TimingTestResult",

@@ -19,9 +19,11 @@ index-based, composes with any model or backtest.
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from itertools import combinations
 
 import numpy as np
+import pandas as pd
 
 
 def n_backtest_paths(n_groups: int, n_test_groups: int) -> int:
@@ -133,6 +135,67 @@ def assemble_backtest_paths(n_groups: int = 6, n_test_groups: int = 2) -> np.nda
             paths[appearances[g], g] = split_idx
             appearances[g] += 1
     return paths
+
+
+def assemble_path_returns(
+    split_returns: Sequence[pd.Series],
+    n_samples: int,
+    n_groups: int = 6,
+    n_test_groups: int = 2,
+) -> pd.DataFrame:
+    """Stitch per-split out-of-sample returns into the φ full backtest paths.
+
+    The missing piece between the CPCV machinery and PBO-style diagnostics:
+    after running a model over :func:`combinatorial_purged_splits`, each
+    split yields an out-of-sample return series on its test bars. This
+    weaves those C(N, k) series into φ = C(N−1, k−1) *complete* return
+    paths using the :func:`assemble_backtest_paths` assignment — the
+    per-path performance distribution that
+    :func:`~src.validation.pbo.probability_of_backtest_overfitting` and
+    plain path-Sharpe histograms consume.
+
+    Args:
+        split_returns: One Series per split, in the split generator's
+            order, indexed by *integer bar position* and covering at least
+            that split's test indices (extra bars are ignored).
+        n_samples: Number of ordered observations.
+        n_groups: Contiguous blocks N used for the splits.
+        n_test_groups: Test blocks per split k.
+
+    Returns:
+        DataFrame of shape ``(n_samples, φ)``: column ``j`` is backtest
+        path ``j``'s return per bar, every bar covered exactly once.
+
+    Raises:
+        ValueError: If the split count is wrong, a split is missing test
+            bars, or values are NaN.
+    """
+    _validate_groups(n_groups, n_test_groups)
+    expected = math.comb(n_groups, n_test_groups)
+    if len(split_returns) != expected:
+        raise ValueError(f"expected {expected} split series, got {len(split_returns)}.")
+
+    blocks = np.array_split(np.arange(n_samples), n_groups)
+    paths = assemble_backtest_paths(n_groups=n_groups, n_test_groups=n_test_groups)
+    phi = paths.shape[0]
+
+    out = np.empty((n_samples, phi))
+    for j in range(phi):
+        for g in range(n_groups):
+            series = split_returns[paths[j, g]]
+            needed = blocks[g]
+            missing = needed[~np.isin(needed, series.index)]
+            if len(missing):
+                raise ValueError(
+                    f"split {paths[j, g]} is missing test bars {missing[:5].tolist()}"
+                    f" required for group {g}."
+                )
+            values = series.loc[needed].to_numpy(dtype=float)
+            if np.isnan(values).any():
+                raise ValueError(f"split {paths[j, g]} contains NaN returns.")
+            out[needed, j] = values
+
+    return pd.DataFrame(out, index=np.arange(n_samples), columns=list(range(phi)))
 
 
 def _validate_groups(n_groups: int, n_test_groups: int) -> None:
