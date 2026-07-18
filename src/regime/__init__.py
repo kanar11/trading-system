@@ -17,7 +17,9 @@ from src.regime.hmm_filter import filter_hmm_probabilities, filtered_hmm_states
 from src.regime.market_states import BEAR, BULL, bull_bear_labels
 from src.regime.transitions import (
     forecast_regime_probabilities,
+    markov_entropy_rate,
     regime_durations,
+    regime_predictability,
     regime_transition_matrix,
     stationary_distribution,
 )
@@ -37,6 +39,8 @@ __all__ = [
     "regime_durations",
     "stationary_distribution",
     "forecast_regime_probabilities",
+    "markov_entropy_rate",
+    "regime_predictability",
     "financial_turbulence",
     "turbulent_periods",
     "VolRegime",

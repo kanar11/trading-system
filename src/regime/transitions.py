@@ -124,6 +124,57 @@ def forecast_regime_probabilities(
     return pd.Series(forecast, index=transition_matrix.index, name="forecast")
 
 
+def markov_entropy_rate(transition_matrix: pd.DataFrame, base: float = 2.0) -> float:
+    """Entropy rate of the regime chain, ``H = −Σ_i π_i Σ_j P_ij log P_ij``.
+
+    The average per-step uncertainty about the *next* regime given the
+    current one, weighted by the stationary distribution — the
+    information-theoretic answer to "how forecastable is this regime
+    process". 0 for a deterministic chain; ``log(K)`` for one whose next
+    state is uniform noise. Zero-probability transitions contribute 0
+    (the ``0·log 0`` convention).
+
+    Args:
+        transition_matrix: Row-stochastic P(to | from), e.g. from
+            :func:`regime_transition_matrix`.
+        base: Logarithm base (2 = bits, ``math.e`` = nats).
+
+    Returns:
+        The entropy rate in units of ``log base``.
+
+    Raises:
+        ValueError: If the matrix is invalid or ``base`` <= 1.
+    """
+    if base <= 1:
+        raise ValueError(f"base must be > 1, got {base}.")
+    matrix = _validated_matrix(transition_matrix)
+    pi = stationary_distribution(transition_matrix).to_numpy()
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        log_p = np.where(matrix > 0, np.log(matrix) / np.log(base), 0.0)
+    row_entropy = -(matrix * log_p).sum(axis=1)
+    return float(pi @ row_entropy)
+
+
+def regime_predictability(transition_matrix: pd.DataFrame) -> float:
+    """Normalised forecastability score ``1 − H / H_max`` in [0, 1].
+
+    1 means the next regime is fully determined by the current one; 0
+    means the chain carries no information (uniform transitions). A
+    single-state chain is trivially predictable (1.0).
+
+    Raises:
+        ValueError: If the matrix is invalid.
+    """
+    matrix = _validated_matrix(transition_matrix)
+    n_states = matrix.shape[0]
+    if n_states == 1:
+        return 1.0
+    h_max = float(np.log2(n_states))
+    entropy = markov_entropy_rate(transition_matrix, base=2.0)
+    return float(np.clip(1.0 - entropy / h_max, 0.0, 1.0))
+
+
 def regime_durations(regimes: pd.Series) -> pd.Series:
     """Average consecutive dwell time (in bars) per regime.
 
