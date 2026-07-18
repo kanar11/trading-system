@@ -2,10 +2,11 @@
 
 A Python research platform for designing, testing, and evaluating systematic trading strategies on market data — modelled after professional quant-trading stacks.
 
-This project is structured around two complementary backtesting modes:
+This project is structured around three complementary backtesting modes:
 
 1. **Vectorised mode** (`src.backtest.engine`) — signal-in / equity-out, blazing fast, ideal for parameter sweeps and walk-forward research.
-2. **Event-driven mode** (`src.backtest.event_engine`) — bar-by-bar simulation with a full Order Management System (limit / stop / stop-limit orders, partial fills, commission + slippage, cost-basis position tracking). Same API surface as the paper-broker live adapter, so strategies port straight to a live broker without rewrites.
+2. **Event-driven mode** (`src.backtest.event_engine`) — bar-by-bar simulation with a full Order Management System (limit / stop / stop-limit orders, DAY/GTC/IOC/FOK, partial fills, commission + slippage, cost-basis position tracking). Same API surface as the paper-broker live adapter. A **signal bridge** (`src.backtest.signal_bridge`) replays any signal strategy through this engine, so the same idea is graded research-fast *and* execution-realistic.
+3. **Weight-frame mode** (`src.backtest.weights`) — a vectorised multi-asset engine over target-weight frames (rotation strategies, portfolio optimisers), with turnover costs and its own walk-forward harness (`walk_forward_weights`).
 
 ## Architecture
 
@@ -40,150 +41,97 @@ Plug-in points: indicators (`src.indicators`), position sizing (`src.risk.sizing
 
 ## What the project does
 
-The system currently:
+**Data** (`src.data`):
 
-- downloads OHLCV data via `yfinance` or local CSV, with a transparent parquet-backed cache (`src.data.cache`)
-- ships pre-defined universes (FAANG, Dow 30, sector ETFs, benchmarks, factor ETFs) in `src.data.universe`, with list / combine / membership helpers
-- aggregates intraday bars to any frequency via `src.data.resample` (1m → 5m → 1h → 1D → 1W → 1ME)
-- audits OHLCV data quality — duplicate timestamps, unsorted index, missing values, OHLC inconsistencies, extreme returns, stale-price runs — and conservatively cleans it (`src.data.quality`)
-- generates synthetic GBM OHLCV for offline demos and tests — always OHLC-consistent and positive (`src.data.synthetic`)
-- maintains a comprehensive technical-indicators library (`src.indicators`): SMA / EMA / WMA / VWMA, RSI, MACD, Stochastic, Williams %R, CCI, ROC, ATR (SMA/EMA/Wilder smoothings), Bollinger, Keltner, Donchian, OBV, anchored VWAP, Chaikin A/D, Hull MA, Aroon, TRIX, CMO, MFI, SuperTrend, Vortex, Ichimoku, Elder-Ray, Chaikin Volatility
-- generates trading signals using eleven strategy templates: momentum, mean reversion, Donchian breakout, EMA crossover, MACD, TRIX, MFI mean reversion, HMM regime-switching, Bollinger/Keltner squeeze, pairs (cointegration), and adaptive (regime-based)
-- combines multiple strategies via majority vote, weighted sum or unanimous-consent ensemble combiners
-- detects market regimes (trending vs mean-reverting) using ADX and Hurst exponent, or a data-driven Gaussian HMM (Baum-Welch EM + Viterbi, pure numpy), with transition-matrix and dwell-time analytics
-- runs **vectorised** backtests with transaction costs, volatility targeting and a risk middleware (stop-loss, take-profit, trailing stop, position limits, daily loss limit)
-- summarises the strategy's position path — time in market, average long/short exposure, turnover and trade count (`src.backtest.summarize_exposure`)
-- builds reusable equity and underwater (drawdown) curves from any return series (`src.backtest.equity_curve` / `drawdown_series`)
-- runs **event-driven** backtests through a full OMS — MARKET / LIMIT / STOP / STOP_LIMIT orders, DAY / GTC / IOC / FOK TIF, intrabar limit matching, gap-safe stop fills, partial fills, weighted-avg cost basis, realized vs unrealized PnL splits
-- models realistic execution costs (bid-ask spread + square-root market impact + fixed commission), plus Almgren-Chriss optimal-execution scheduling and participation-rate impact
-- runs post-trade transaction-cost analysis — implementation shortfall vs arrival price and VWAP slippage (`src.execution.tca`)
-- offers position-sizing helpers: fractional Kelly, ATR-based, fixed-fractional, volatility-target, CPPI, drawdown-throttle and Ralph-Vince optimal-f sizing
-- exposes a `Broker` interface with a `PaperBroker` implementation that shares the same OMS — a clean seam for future IB / Alpaca / Binance adapters
-- reports portfolio exposure analytics — gross/net/long/short exposure, leverage and a Herfindahl concentration index — plus per-order fill analytics (VWAP, maker/taker mix, fill duration) from the OMS (`src.oms.portfolio_exposure`, `src.oms.summarize_fills`)
-- computes **30+ performance metrics** including Sharpe, Sortino, Calmar, CAGR, max drawdown, **Value-at-Risk** (historical / parametric), **Conditional VaR**, **Omega ratio**, **Ulcer Index**, **gain-to-pain**, **drawdown duration & recovery time**, **tail ratio**, **downside/upside deviation**, **rolling beta vs benchmark**, **skew / kurtosis**, **tracking error & information ratio**, **Sterling / Burke ratios**, **Treynor / Jensen's alpha / M²**
-- runs walk-forward validation, Monte Carlo bootstrap, trade-shuffle robustness and statistical Sharpe significance tests (t-test, Probabilistic SR, **Deflated SR** for multiple-testing correction), plus a CSCV **Probability of Backtest Overfitting** estimate, **purged & embargoed K-fold** cross-validation, and **White's Reality Check** for data-snooping
-- aggregates single-asset strategies into a multi-asset portfolio (equal-weight, inverse-vol, custom, min-variance, max-Sharpe, risk-parity, maximum-diversification, or hierarchical-risk-parity weights)
-- analyses portfolio risk — total volatility, per-asset risk contributions, diversification ratio and effective number of assets (`src.portfolio.analytics`)
-- runs factor / attribution regression to separate alpha from passive factor exposure, plus up/down market capture ratios
-- generates multi-panel tear-sheet reports (equity, drawdown, rolling Sharpe, monthly heatmap, distribution, metrics table)
-- tabulates periodic returns — a year x month table with an annual total, per-year returns, and rolling annualised return / volatility / Sharpe (`src.reporting.periodic`)
-- tabulates the worst drawdown episodes — peak / trough / recovery dates, depth and length (`src.reporting.drawdown_table`)
-- exports trade logs and parameter sweep results
-- ships an end-to-end `examples/full_demo.py` and a GitHub Actions CI workflow
+- downloads OHLCV via `yfinance` or local CSV with a parquet-backed cache; pre-defined universes (FAANG, Dow 30, sectors, benchmarks, factors); bar resampling (1m → 1D → 1W → 1ME) and intraday session filtering (RTH windows, overnight sessions wrapping midnight)
+- audits data quality (duplicates, OHLC inconsistencies, extreme returns, stale runs) and detects *missing* bars — modal frequency inference plus a gap report against an expected calendar grid
+- trading-calendar helpers derived from the bar index itself (rebalance dates per W/M/Q/Y, trading day of month, turn-of-month logic); CRSP-style back-adjustment for splits and dividends
+- return transforms pinned down once (simple/log/excess, returns↔prices round-trips), a wide price-panel builder for the multi-asset pipeline, and a synthetic GBM OHLCV generator for offline tests
+
+**Signals & regimes** (`src.indicators`, `src.strategy`, `src.regime`):
+
+- a 34-indicator vectorised TA library: trend (SMA/EMA/WMA/VWMA/HMA, Aroon, Vortex, Ichimoku, KAMA, Parabolic SAR, ADX/DI), momentum (RSI, MACD, Stochastic, StochRSI, Williams %R, CCI, ROC, TRIX, CMO, Elder-Ray, 12-1 skip-month momentum, 52-week-high distance), volatility (ATR, Bollinger, Keltner, Donchian, SuperTrend, Chaikin Volatility, Choppiness) and volume (OBV, anchored VWAP, Chaikin A/D, MFI)
+- seventeen strategy templates: momentum, mean reversion, Donchian breakout, EMA crossover, MACD, TRIX, MFI, HMM regime-switching, squeeze, pairs (cointegration), adaptive (regime-based), time-series momentum (12-1 TSMOM), dual momentum (multi-asset rotation), turn-of-month seasonal, KAMA adaptive trend — plus majority/weighted/unanimous ensemble combiners
+- regime detection four ways: ADX + Hurst voting, Gaussian HMM (Baum-Welch + Viterbi, plus a **causal forward filter** for out-of-sample use), trailing-quantile volatility regimes with hysteresis, and 20%-drawdown bull/bear labels; Markov analytics on top (transition matrix, dwell times, stationary distribution, k-step forecasts, entropy rate / predictability) and per-regime performance attribution
+
+**Backtesting** (`src.backtest`):
+
+- vectorised engine with costs, vol targeting and risk middleware; event-driven engine with the full OMS; weight-frame engine for rotation/allocation strategies; a signal→event-engine bridge so one strategy grades in both worlds
+- walk-forward for weight rules (strictly out-of-sample refits), execution-lag sensitivity tables, per-trade MAE/MFE excursions, trade statistics, exposure/turnover summaries and equity/drawdown curves
+
+**Execution & OMS** (`src.execution`, `src.oms`):
+
+- cost models from reduced-form (spread + √-impact) to Almgren-Chriss trajectories; child-order schedules (TWAP, VWAP, POV, iceberg with size jitter); limit-fill simulation bracketed two ways (optimistic touch and FIFO queue burn-through); post-trade TCA (implementation shortfall, VWAP slippage, effective/realized spread + price impact decomposition); short-borrow and margin financing drag
+- an OMS with strict order lifecycles, commission schedules, pre-trade risk checks (fat-finger caps, position/leverage limits, price collars, restricted lists), a Reg-T margin/buying-power model, weight→order rebalance planning, pro-rata block allocation, split/dividend bookkeeping and exposure/fill analytics; a `PaperBroker` sharing the same OMS
+
+**Risk & portfolio** (`src.risk`, `src.portfolio`):
+
+- the VaR family (historical, parametric, Cornish-Fisher modified, CVaR) plus factor-model VaR with systematic/idio decomposition and scenario stress testing (per-asset and factor-level shocks); 30+ performance ratios; seven position sizers; constant-volatility (Barroso-Santa-Clara) risk-managed scaling; stop/TP/trailing/daily-loss middleware
+- portfolio construction: min-variance, max-Sharpe, risk parity, arbitrary risk budgets, max diversification, HRP, the Merton efficient frontier and Black-Litterman posteriors — fed by three covariance estimators (sample, Ledoit-Wolf shrinkage, EWMA/RiskMetrics) — with turnover-budgeted rebalancing and risk-contribution analytics
+
+**Validation** (`src.validation`):
+
+- walk-forward, Monte Carlo bootstrap and trade-shuffle robustness; Sharpe t-test, Probabilistic and Deflated Sharpe; PBO (CSCV); purged & embargoed K-fold; **CPCV** with backtest-path assembly down to per-path return series; White's Reality Check and **Hansen's SPA**; Treynor-Mazuy / Henriksson-Merton market-timing regressions
+
+**Reporting** (`src.reporting`):
+
+- factor/alpha attribution with capture ratios and rolling alpha/beta; benchmark head-to-head tables and a multi-strategy league table; calendar seasonality (month-of-year, day-of-week, turn-of-month); periodic return tables, drawdown episode tables, matplotlib tear-sheets and a self-contained HTML report
 
 ## Project structure
 
 ```text
 trading_system/
-├── src/
-│   ├── data/
-│   │   ├── loader.py              # Yahoo Finance data download
-│   │   ├── csv_loader.py          # Local CSV OHLCV loader (offline / custom data)
-│   │   ├── cache.py               # Parquet-backed loader cache
-│   │   ├── resample.py            # OHLCV bar aggregation (1m -> 1D, etc.)
-│   │   ├── universe.py            # FAANG / Dow30 / sectors / benchmarks / factors
-│   │   ├── quality.py             # OHLCV data-quality auditor + cleaner
-│   │   └── synthetic.py           # Synthetic GBM OHLCV generator (offline)
-│   ├── indicators/                # Comprehensive vectorised TA library
-│   │   ├── trend.py               # SMA / EMA / WMA / VWMA
-│   │   ├── momentum.py            # RSI / MACD / Stochastic / Williams %R / CCI / ROC
-│   │   ├── volatility.py          # ATR / Bollinger / Keltner / Donchian
-│   │   └── volume.py              # OBV / VWAP (anchored) / Chaikin A/D
-│   ├── strategy/
-│   │   ├── base.py                # Abstract Strategy class + SmaCrossover example
-│   │   ├── momentum.py            # Momentum signal generator
-│   │   ├── mean_reversion.py      # Bollinger Bands + RSI strategy
-│   │   ├── breakout.py            # Donchian channel breakout (turtle-style)
-│   │   ├── ema_crossover.py       # Fast/slow EMA and MACD crossover signals
-│   │   ├── trix.py                # TRIX triple-EMA trend-following strategy
-│   │   ├── mfi.py                 # Money Flow Index mean-reversion strategy
-│   │   ├── hmm_regime.py          # Gaussian-HMM regime-switching strategy
-│   │   ├── squeeze.py             # Bollinger/Keltner squeeze breakout
-│   │   ├── pairs.py               # Cointegration-based pairs trading
-│   │   └── ensemble.py            # Majority / weighted / unanimous combiners
+├── src/                           # ~120 typed modules across 11 packages
+│   ├── data/                      # loaders, cache, resample, sessions, universes,
+│   │   │                          #   quality + gap detection, calendar, corporate
+│   │   │                          #   actions, returns transforms, panel builder,
+│   │   └── ...                    #   synthetic GBM
+│   ├── indicators/                # 34-indicator vectorised TA library
+│   │   ├── trend.py               #   SMA/EMA/WMA/VWMA/HMA, Aroon, Vortex, Ichimoku,
+│   │   ├── momentum.py            #   KAMA, PSAR, ADX/DI · RSI, MACD, Stoch(+RSI),
+│   │   ├── volatility.py          #   W%R, CCI, ROC, TRIX, CMO, Elder-Ray, 12-1 mom,
+│   │   └── volume.py              #   52w-high · ATR, BB, KC, Donchian, SuperTrend,
+│   │                              #   Chaikin vol, Choppiness · OBV, VWAP, A/D, MFI
+│   ├── strategy/                  # 17 signal/weight templates + ensembles
+│   │   └── ...                    #   (momentum family, mean reversion, breakouts,
+│   │                              #   TSMOM, dual momentum, turn-of-month, KAMA...)
 │   ├── backtest/
-│   │   ├── engine.py              # Vectorised cost-aware backtest engine
-│   │   ├── event_engine.py        # Event-driven engine with full OMS
-│   │   ├── exposure.py            # Position-path exposure / turnover summary
-│   │   └── curves.py              # Equity + underwater (drawdown) curves
-│   ├── oms/                       # Order Management System
-│   │   ├── order.py               # Order / OrderStatus / OrderType / Side / TIF
-│   │   ├── position.py            # Per-symbol position with cost basis + PnL
-│   │   ├── portfolio.py           # Cash + positions + equity history
-│   │   └── analytics.py           # Exposure / leverage / concentration + fill analytics
-│   ├── live/
-│   │   └── broker.py              # Broker interface + PaperBroker implementation
-│   ├── execution/
-│   │   ├── slippage.py            # Spread + sqrt-impact execution model
-│   │   ├── impact.py              # Participation-rate cost + Almgren-Chriss scheduling
-│   │   └── tca.py                 # Post-trade TCA (implementation shortfall, VWAP slip)
-│   ├── risk/
-│   │   ├── manager.py             # Risk management middleware
-│   │   ├── sizing.py              # Kelly / ATR / fixed-fractional sizing
-│   │   └── metrics.py             # VaR / CVaR / Omega / Ulcer / drawdown stats / rolling beta
-│   ├── regime/
-│   │   ├── detector.py            # Market regime detection (ADX + Hurst)
-│   │   ├── hmm.py                 # Gaussian HMM regime detector (Baum-Welch + Viterbi)
-│   │   └── transitions.py         # Regime transition matrix + dwell times
-│   ├── validation/
-│   │   ├── walk_forward.py        # Walk-forward validation framework
-│   │   ├── monte_carlo.py         # Bootstrap + trade-shuffle robustness
-│   │   ├── stat_tests.py          # Sharpe t-test, Probabilistic & Deflated SR
-│   │   ├── pbo.py                 # Probability of Backtest Overfitting (CSCV)
-│   │   ├── purged_cv.py           # Purged & embargoed K-fold CV splits
-│   │   └── reality_check.py       # White's Reality Check (data-snooping)
-│   ├── portfolio/
-│   │   ├── portfolio.py           # Multi-asset portfolio backtest
-│   │   ├── optimizer.py           # Min-variance / max-Sharpe / risk-parity / HRP weights
-│   │   └── analytics.py           # Risk contributions / diversification / vol
-│   └── reporting/
-│       ├── metrics.py             # Portfolio metrics + trade analytics
-│       ├── plots.py               # Equity curve plotting
-│       ├── trades.py              # Trade log builder (standalone utility)
-│       ├── sweep.py               # Parameter sweep runner
-│       ├── tearsheet.py           # Multi-panel PNG tear-sheet report
-│       ├── attribution.py         # Factor / alpha regression
-│       ├── periodic.py            # Calendar return tables + rolling metrics
-│       └── drawdowns.py           # Worst-drawdown episode table
-├── tests/
-│   ├── conftest.py                # Shared fixtures (OHLCV, returns)
-│   ├── test_metrics.py            # Portfolio + trade-level metric tests
-│   ├── test_risk_manager.py       # Risk controls tests
-│   ├── test_momentum.py           # Momentum strategy tests
-│   ├── test_mean_reversion.py     # Mean reversion strategy tests
-│   ├── test_walk_forward.py       # Walk-forward validation tests
-│   ├── test_monte_carlo.py        # Monte Carlo robustness tests
-│   ├── test_regime.py             # Regime detection tests
-│   ├── test_breakout.py           # Donchian breakout tests
-│   ├── test_sizing.py             # Position-sizing tests
-│   ├── test_portfolio.py          # Portfolio backtest tests
-│   ├── test_optimizer.py          # Portfolio optimiser tests
-│   ├── test_execution.py          # Execution-cost model tests
-│   ├── test_tearsheet.py          # Tear-sheet generator tests
-│   ├── test_attribution.py        # Factor attribution tests
-│   ├── test_csv_loader.py         # CSV loader tests
-│   ├── test_ema_crossover.py      # EMA / MACD strategy tests
-│   ├── test_pairs.py              # Pairs trading / cointegration tests
-│   ├── test_ensemble.py           # Signal-ensemble tests
-│   ├── test_stat_tests.py         # Sharpe significance / DSR tests
-│   ├── test_oms.py                # OMS: Order / Position / Portfolio tests
-│   ├── test_event_engine.py       # Event-driven engine tests
-│   ├── test_strategy_base.py      # Strategy ABC + SmaCrossover tests
-│   ├── test_indicators.py         # Indicators library tests
-│   ├── test_risk_metrics.py       # VaR / CVaR / Omega / drawdown tests
-│   ├── test_data_extras.py        # Cache / resample / universe tests
-│   ├── test_live_broker.py        # PaperBroker tests
-│   └── test_engine.py             # Backtest engine tests
-├── examples/
-│   └── full_demo.py               # End-to-end demo touching every module
-├── .github/workflows/
-│   └── ci.yml                     # CI: ruff + mypy + pytest/coverage (3.11 + 3.12)
-├── main.py                        # Main pipeline entry point (CLI)
-├── grid_search.py                 # Grid search script
-├── plot_heatmap.py                # Heatmap visualisation
-├── pyproject.toml                 # Project config and dependencies
-├── requirements.txt
-└── README.md
+│   │   ├── engine.py              # vectorised signal engine
+│   │   ├── event_engine.py        # event-driven engine with full OMS
+│   │   ├── weights.py             # multi-asset weight-frame engine
+│   │   ├── signal_bridge.py       # signal strategies -> event engine
+│   │   ├── walk_forward_weights.py# strictly-OOS refits for weight rules
+│   │   ├── robustness.py          # execution-lag sensitivity tables
+│   │   ├── excursions.py          # per-trade MAE / MFE analysis
+│   │   └── ...                    # curves, trades, exposure
+│   ├── oms/                       # orders, positions, portfolio, fees, pre-trade
+│   │   └── ...                    #   checks, Reg-T margin, rebalance planner,
+│   │                              #   pro-rata allocation, corporate actions
+│   ├── live/broker.py             # Broker interface + PaperBroker (same OMS)
+│   ├── execution/                 # slippage, Almgren-Chriss, TWAP/VWAP/POV/iceberg,
+│   │   └── ...                    #   limit fills + FIFO queue model, TCA, spreads,
+│   │                              #   financing costs
+│   ├── risk/                      # risk middleware, 7 sizers, VaR family (+CF,
+│   │   └── ...                    #   factor-model), stress scenarios, BSC scaling,
+│   │                              #   30+ ratios
+│   ├── regime/                    # ADX+Hurst, HMM (+causal filter), vol regimes,
+│   │   └── ...                    #   bull/bear labels, Markov analytics + entropy,
+│   │                              #   turbulence, per-regime performance
+│   ├── validation/                # walk-forward, MC, PSR/DSR, PBO, purged K-fold,
+│   │   └── ...                    #   CPCV + path assembly, Reality Check, SPA,
+│   │                              #   market-timing tests
+│   ├── portfolio/                 # optimisers (MV/maxSharpe/RP/risk-budget/maxDiv/
+│   │   └── ...                    #   HRP), frontier, Black-Litterman, Ledoit-Wolf,
+│   │                              #   EWMA cov, turnover budgeting, analytics
+│   └── reporting/                 # metrics, attribution (+rolling alpha/beta),
+│       └── ...                    #   benchmark & league tables, seasonality,
+│                                  #   periodic/drawdown tables, tearsheet, HTML report
+├── tests/                         # 75+ test files, 1100+ tests, ~93.5% coverage
+├── examples/full_demo.py          # end-to-end demo touching every module
+├── .github/workflows/ci.yml       # CI: ruff + mypy --strict + pytest (3.11 + 3.12)
+├── main.py                        # CLI entry point (single-asset signal pipeline)
+├── grid_search.py                 # parameter sweep script
+└── pyproject.toml                 # config: ruff, mypy strict, coverage gate
 ```
 
 ## How to run
@@ -266,8 +214,8 @@ python examples/full_demo.py
 ### 4. Run tests
 
 ```bash
-pytest                                          # 323 tests
-pytest --cov=src --cov-report=term-missing      # with coverage (floor: 80%, ~86% now)
+pytest                                          # 1100+ tests
+pytest --cov=src --cov-report=term-missing      # with coverage (floor: 80%, ~93.5% now)
 ```
 
 ### 5. Code quality
@@ -285,6 +233,8 @@ matrix and are expected to pass cleanly (ruff, ruff-format, mypy --strict, and
 pytest + coverage).
 
 ## Strategies
+
+Seventeen templates ship in `src.strategy`. The classics below are documented in detail; the newer additions follow the same conventions — **TSMOM** (`tsmom.py`, Moskowitz-Ooi-Pedersen 12-1 time-series momentum with month-end decisions), **dual momentum** (`dual_momentum.py`, multi-asset relative+absolute rotation emitting a weight frame), **turn-of-month** (`turn_of_month.py`, the Lakonishok-Smidt −1/+3 seasonal window) and **KAMA trend** (`kama_trend.py`, adaptive-MA crossover with exit hysteresis). Any template's `signal` column runs through the vectorised engine, and via `run_signal_event_backtest` through the event engine too.
 
 ### Momentum
 
@@ -430,7 +380,7 @@ result = fit_gaussian_hmm(returns.to_numpy(), HMMConfig(n_states=3))
 print(result.state_means, result.transition, result.log_likelihood)
 ```
 
-The scaled forward-backward pass keeps the likelihood numerically stable on long series, and `HMMResult.posterior` exposes the smoothed `P(state | data)` for soft-allocation use.
+The scaled forward-backward pass keeps the likelihood numerically stable on long series, and `HMMResult.posterior` exposes the smoothed `P(state | data)` for soft-allocation use. Because the posterior conditions on the *whole* sample, live use goes through `src.regime.filter_hmm_probabilities` / `filtered_hmm_states` — a strictly causal forward filter over a fitted model (fit on a training window, filter new observations as they arrive).
 
 ### Regime transition analytics
 
@@ -675,6 +625,8 @@ print(result.p_value, result.best_strategy)  # small p -> the best edge is real
 
 A moving-block bootstrap preserves short-range autocorrelation; the p-value is the share of recentred bootstrap max-statistics that exceed the observed one.
 
+`src/validation/spa.py` upgrades this to **Hansen's SPA test**: statistics are studentised (a noisy irrelevant candidate no longer dominates the max) and the consistent null keeps the negative means of significantly-bad strategies (stuffing the set with garbage no longer inflates the p-value). It returns the ordered `lower ≤ consistent ≤ upper` p-value triple. For path-level diagnostics, `src/validation/cpcv.py` generates combinatorial purged splits and reassembles per-split out-of-sample returns into the φ full backtest paths that PBO consumes.
+
 ## Multi-asset portfolio
 
 `src/portfolio/portfolio.py` runs the same single-asset strategy across a basket of tickers and aggregates the per-asset return streams into a portfolio using one of three weighting schemes:
@@ -683,15 +635,24 @@ A moving-block bootstrap preserves short-range autocorrelation; the p-value is t
 - **`inverse_vol`** — weights inversely proportional to trailing realised volatility (simple risk-parity proxy).
 - **`custom`** — user-supplied static weights, normalised to sum to 1.
 
-For covariance-aware allocation, `src/portfolio/optimizer.py` provides five closed-form / iterative schemes (no scipy required):
+For covariance-aware allocation, `src/portfolio/optimizer.py` provides six closed-form / iterative schemes (no scipy required):
 
 - **`min_variance_weights(returns, cov=None)`** — long-only minimum-variance portfolio via `Σ⁻¹ 1`.
 - **`max_sharpe_weights(returns, cov=None, rf_daily=0)`** — long-only tangency portfolio via `Σ⁻¹ (μ − rf)`.
 - **`risk_parity_weights(returns, cov=None)`** — true equal risk-contribution weights via cyclical coordinate descent (Maillard, Roncalli & Teïletche 2010).
+- **`risk_budget_weights(returns, budgets, cov=None)`** — the arbitrary-budget generalisation: risk contributions proportional to any positive budget vector.
 - **`maximum_diversification_weights(returns, cov=None)`** — most-diversified portfolio via `Σ⁻¹ σ` (Choueifaty & Coignard 2008); reduces to inverse-vol for uncorrelated assets.
 - **`hierarchical_risk_parity_weights(returns, cov=None)`** — HRP: correlation-distance clustering → quasi-diagonalisation → recursive bisection (López de Prado 2016).
 
 The closed-form optimisers clip negative weights to zero and re-normalise; HRP is long-only by construction.
+
+Around the optimisers the package also ships:
+
+- **`efficient_frontier(returns, n_points)`** — the Merton closed-form mean-variance frontier with min-vol / max-Sharpe locators.
+- **`black_litterman(returns, market_weights, views, ...)`** — equilibrium-implied returns tilted toward investor views (He-Litterman posterior); the posterior covariance drops straight back into the optimisers.
+- **`ledoit_wolf_covariance(returns)`** / **`ewma_covariance(returns, decay=0.94)`** — well-conditioned shrinkage and responsive RiskMetrics estimators as alternatives to the sample covariance (all optimisers accept `cov=`).
+- **`constrain_turnover(current, target, max_turnover)`** / **`portfolio_turnover`** — turnover-budgeted rebalancing between any two weight vectors.
+- **`walk_forward_weights(prices, weight_fn, ...)`** (in `src.backtest`) — rolling refits of any history→weights rule, traded strictly out of sample through the weight-frame engine, and **`rebalance_orders`** (in `src.oms`) to turn target weights into a broker-ready order list.
 
 Risk diagnostics for a given weight vector + covariance live in `src/portfolio/analytics.py`:
 
@@ -838,9 +799,9 @@ Core portfolio-level metrics computed from the daily return series:
 
 | Family       | Indicators                                                                       |
 |--------------|----------------------------------------------------------------------------------|
-| Trend        | `sma`, `ema`, `wma`, `vwma`, `hma`, `aroon`, `vortex`, `ichimoku`                |
-| Momentum     | `rsi`, `macd`, `stochastic`, `williams_r`, `cci`, `roc`, `trix`, `cmo`, `elder_ray` |
-| Volatility   | `atr` (sma/ema/wilder), `bollinger`, `keltner`, `donchian`, `supertrend`, `chaikin_volatility` |
+| Trend        | `sma`, `ema`, `wma`, `vwma`, `hma`, `aroon`, `vortex`, `ichimoku`, `kama`, `parabolic_sar`, `adx` (+DI±) |
+| Momentum     | `rsi`, `macd`, `stochastic`, `stoch_rsi`, `williams_r`, `cci`, `roc`, `trix`, `cmo`, `elder_ray`, `lookback_return` (12-1), `distance_from_high` (52w) |
+| Volatility   | `atr` (sma/ema/wilder), `bollinger` (+%B/bandwidth), `keltner`, `donchian`, `supertrend`, `chaikin_volatility`, `choppiness` |
 | Volume       | `obv`, `vwap` (anchored), `chaikin_ad`, `mfi`                                    |
 
 ```python
@@ -894,12 +855,12 @@ Results are saved to `results/sweep_results.csv` and the top 10 configurations a
 The codebase is research-grade — it ships the architecture and components of a professional trading stack, but is not a production execution venue. Current limitations:
 
 - Default data source is Yahoo Finance (free, end-of-day quality).
-- Regime detection offers both an ADX + Hurst indicator vote and a Gaussian HMM; richer models (non-Gaussian emissions, regime-switching GARCH) are future work.
-- Execution-cost model is reduced-form: spread + sqrt-impact + commission. No order-book simulation, no queue position, no cross-venue routing.
-- Portfolio optimisers clip negative weights and renormalise rather than solving a constrained QP (sufficient for research baskets but not for institutional sizing).
+- Execution modelling is bar-level: reduced-form costs, bracketed limit-fill models (optimistic touch vs FIFO queue burn-through) and child-order schedules — but no full order-book simulation and no cross-venue routing.
+- Portfolio optimisers clip negative weights and renormalise rather than solving a constrained QP (sufficient for research baskets but not for institutional sizing); CVaR optimisation would need an LP solver and is out of scope.
 - Monte Carlo resampling assumes stationary returns (use block bootstrap for short-range autocorrelation).
 - The paper broker fills synchronously at the supplied mark — real broker adapters (IB / Alpaca / Binance) are stubbed only at the interface level.
-- Event engine is single-asset per run; multi-asset event-driven backtesting is left as future work.
+- The event engine is single-asset per run; multi-asset execution realism comes from the weight-frame engine's turnover-cost model instead.
+- The `main.py` CLI covers the single-asset signal pipeline; the multi-asset weight pipeline (panel builder → optimiser/rotation → weight engine → rebalance orders) is currently library-only.
 
 ## Tech stack
 
