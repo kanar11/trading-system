@@ -185,3 +185,41 @@ def distance_from_high(close: pd.Series, window: int = 252) -> pd.Series:
     if window < 1:
         raise ValueError(f"window must be >= 1, got {window}.")
     return close / close.rolling(window, min_periods=window).max() - 1
+
+
+def stoch_rsi(
+    close: pd.Series,
+    rsi_period: int = 14,
+    stoch_period: int = 14,
+    smooth_k: int = 3,
+    smooth_d: int = 3,
+) -> pd.DataFrame:
+    """Stochastic RSI (Chande & Kroll) — the RSI's position in its own range.
+
+    Applies the stochastic transform to the RSI itself::
+
+        stoch_rsi = 100 · (RSI − min(RSI, n)) / (max(RSI, n) − min(RSI, n))
+
+    which is far more sensitive than raw RSI: it pins to 100 while RSI
+    keeps making new highs and to 0 at new lows. ``k`` smooths it with an
+    SMA and ``d`` smooths ``k`` (the usual 3/3 signal pair). Windows where
+    the RSI is exactly flat have no defined position and stay NaN.
+
+    Returns a DataFrame with ``stoch_rsi``, ``k`` and ``d`` columns, all
+    in [0, 100].
+
+    Raises:
+        ValueError: If any window is < 1.
+    """
+    if min(rsi_period, stoch_period, smooth_k, smooth_d) < 1:
+        raise ValueError("rsi_period, stoch_period, smooth_k and smooth_d must be >= 1.")
+
+    strength = rsi(close, period=rsi_period)
+    lowest = strength.rolling(stoch_period, min_periods=stoch_period).min()
+    highest = strength.rolling(stoch_period, min_periods=stoch_period).max()
+    span = (highest - lowest).replace(0, np.nan)  # flat RSI window: undefined
+    raw = (100 * (strength - lowest) / span).clip(0.0, 100.0)
+
+    k = raw.rolling(smooth_k, min_periods=smooth_k).mean()
+    d = k.rolling(smooth_d, min_periods=smooth_d).mean()
+    return pd.DataFrame({"stoch_rsi": raw, "k": k, "d": d})

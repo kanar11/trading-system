@@ -181,3 +181,36 @@ def chaikin_volatility(high: pd.Series, low: pd.Series, period: int = 10) -> pd.
     ema_range = ema(high - low, period)
     out: pd.Series = 100 * ema_range.pct_change(period)
     return out
+
+
+def choppiness(
+    high: pd.Series,
+    low: pd.Series,
+    close: pd.Series,
+    period: int = 14,
+) -> pd.Series:
+    """Choppiness Index (Dreiss) — trending vs range-bound market state.
+
+    Compares the path length (sum of true ranges) to the net range over
+    the window::
+
+        CHOP = 100 · log10( ΣTR(period) / (maxHigh − minLow) ) / log10(period)
+
+    A straight one-directional move scores near 0 (path == range); a
+    market that travels far but goes nowhere scores toward 100. Common
+    thresholds: > 61.8 choppy, < 38.2 trending. Complements ``adx``
+    (which measures trend *strength* directionally).
+
+    Raises:
+        ValueError: If ``period`` < 2.
+    """
+    if period < 2:
+        raise ValueError(f"period must be >= 2, got {period}.")
+
+    tr_sum = _true_range(high, low, close).rolling(period, min_periods=period).sum()
+    highest = high.rolling(period, min_periods=period).max()
+    lowest = low.rolling(period, min_periods=period).min()
+    net_range = (highest - lowest).replace(0, np.nan)
+    ratio = (tr_sum / net_range).clip(lower=1.0)  # path >= range up to float dust
+    out: pd.Series = 100 * np.log10(ratio) / np.log10(period)
+    return out.clip(upper=100.0)
