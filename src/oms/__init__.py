@@ -11,6 +11,7 @@ from src.oms.checks import CheckResult, PreTradeLimits, pre_trade_check
 from src.oms.corporate import apply_dividend, apply_split
 from src.oms.fees import FeeSchedule, total_commission
 from src.oms.margin import MarginReport, MarginRequirements, margin_report
+from src.oms.netting import NettingResult, net_orders
 from src.oms.order import (
     Fill,
     IllegalOrderTransition,
@@ -59,4 +60,6 @@ __all__ = [
     "pro_rata_allocation",
     "apply_split",
     "apply_dividend",
+    "NettingResult",
+    "net_orders",
 ]
