@@ -39,6 +39,7 @@ from src.indicators.trend import (
     ichimoku,
     kama,
     parabolic_sar,
+    pivot_points,
     sma,
     vortex,
     vwma,
@@ -68,6 +69,7 @@ __all__ = [
     "kama",
     "parabolic_sar",
     "adx",
+    "pivot_points",
     # momentum
     "rsi",
     "macd",

@@ -325,3 +325,66 @@ def ichimoku(
             "chikou": close.shift(-displacement),
         }
     )
+
+
+def pivot_points(
+    high: pd.Series,
+    low: pd.Series,
+    close: pd.Series,
+    method: str = "classic",
+) -> pd.DataFrame:
+    """Floor-trader pivot points and support / resistance levels.
+
+    The intraday desk's standard support/resistance grid: each bar's levels
+    are derived from the *previous* bar's high/low/close (``shift(1)``), so
+    the values are strictly causal — today's pivots are known at today's
+    open and never peek at the current bar.
+
+    ``method`` selects the pivot formula:
+
+    * ``"classic"`` — ``P = (H + L + C) / 3``.
+    * ``"fibonacci"`` — same pivot, R/S at 0.382 / 0.618 / 1.0 of the range.
+    * ``"woodie"`` — ``P = (H + L + 2C) / 4`` (weights the close).
+
+    Returns a DataFrame with columns ``pivot``, ``r1``/``r2``/``r3`` and
+    ``s1``/``s2``/``s3`` (the third level is omitted for Fibonacci, left as
+    NaN, matching its three-band convention).
+
+    Raises:
+        ValueError: If ``method`` is unknown.
+    """
+    prev_high = high.shift(1)
+    prev_low = low.shift(1)
+    prev_close = close.shift(1)
+    rng = prev_high - prev_low
+
+    if method == "classic":
+        pivot = (prev_high + prev_low + prev_close) / 3.0
+        r1 = 2 * pivot - prev_low
+        s1 = 2 * pivot - prev_high
+        r2 = pivot + rng
+        s2 = pivot - rng
+        r3 = prev_high + 2 * (pivot - prev_low)
+        s3 = prev_low - 2 * (prev_high - pivot)
+    elif method == "woodie":
+        pivot = (prev_high + prev_low + 2 * prev_close) / 4.0
+        r1 = 2 * pivot - prev_low
+        s1 = 2 * pivot - prev_high
+        r2 = pivot + rng
+        s2 = pivot - rng
+        r3 = prev_high + 2 * (pivot - prev_low)
+        s3 = prev_low - 2 * (prev_high - pivot)
+    elif method == "fibonacci":
+        pivot = (prev_high + prev_low + prev_close) / 3.0
+        r1 = pivot + 0.382 * rng
+        s1 = pivot - 0.382 * rng
+        r2 = pivot + 0.618 * rng
+        s2 = pivot - 0.618 * rng
+        r3 = pivot + rng
+        s3 = pivot - rng
+    else:
+        raise ValueError(f"unknown method {method!r}; expected classic/woodie/fibonacci.")
+
+    return pd.DataFrame(
+        {"pivot": pivot, "r1": r1, "r2": r2, "r3": r3, "s1": s1, "s2": s2, "s3": s3}
+    )
