@@ -24,7 +24,7 @@ from src.regime.transitions import (
     stationary_distribution,
 )
 from src.regime.turbulence import financial_turbulence, turbulent_periods
-from src.regime.volatility import VolRegime, realized_volatility, vol_regimes
+from src.regime.volatility import VolRegime, realized_volatility, vol_of_vol, vol_regimes
 
 __all__ = [
     "RegimeConfig",
@@ -46,6 +46,7 @@ __all__ = [
     "VolRegime",
     "realized_volatility",
     "vol_regimes",
+    "vol_of_vol",
     "regime_performance",
     "BULL",
     "BEAR",

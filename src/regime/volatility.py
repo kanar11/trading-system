@@ -61,6 +61,49 @@ def realized_volatility(
     return vol.rename("realized_vol")
 
 
+def vol_of_vol(
+    returns: pd.Series,
+    vol_window: int = 20,
+    vov_window: int = 20,
+    periods_per_year: int = 252,
+    relative: bool = False,
+) -> pd.Series:
+    """Volatility of volatility — how *unstable* the volatility regime is.
+
+    A market can be quietly volatile (a high but steady vol) or
+    treacherously volatile (a vol that itself lurches). Vol-of-vol
+    captures the second: the rolling standard deviation of the annualised
+    realised-volatility path (:func:`realized_volatility`). It spikes
+    around regime transitions — precisely when a constant-exposure book is
+    most likely to be caught wrong-footed — and sits near zero when the
+    volatility level is steady, high or low.
+
+    Args:
+        returns: Per-bar returns.
+        vol_window: Window of the inner realised-volatility estimate (>= 2).
+        vov_window: Window of the outer std-of-vol (>= 2).
+        periods_per_year: Bars per year for annualising the inner vol.
+        relative: If True, divide by the trailing mean vol to get a
+            unit-free coefficient of variation of volatility (comparable
+            across assets of different vol levels).
+
+    Returns:
+        Series named ``"vol_of_vol"`` (NaN during the warm-up).
+
+    Raises:
+        ValueError: If either window is < 2 or ``periods_per_year`` < 1.
+    """
+    if vov_window < 2:
+        raise ValueError(f"vov_window must be >= 2, got {vov_window}.")
+
+    vol = realized_volatility(returns, window=vol_window, periods_per_year=periods_per_year)
+    vov = vol.rolling(vov_window).std()
+    if relative:
+        mean_vol = vol.rolling(vov_window).mean().replace(0.0, np.nan)
+        vov = vov / mean_vol
+    return vov.rename("vol_of_vol")
+
+
 def _run_state_machine(
     vol: np.ndarray,
     q_low: np.ndarray,
