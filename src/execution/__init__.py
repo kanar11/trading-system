@@ -30,6 +30,7 @@ from src.execution.tca import (
     implementation_shortfall,
     vwap_slippage,
 )
+from src.execution.volume_profile import intraday_volume_profile
 
 __all__ = [
     "ExecutionConfig",
@@ -53,4 +54,5 @@ __all__ = [
     "effective_spread",
     "realized_spread",
     "price_impact",
+    "intraday_volume_profile",
 ]
