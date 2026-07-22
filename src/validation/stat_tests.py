@@ -143,6 +143,63 @@ def probabilistic_sharpe_ratio(
     return _norm_cdf(z)
 
 
+def minimum_track_record_length(
+    returns: pd.Series,
+    target_sharpe: float = 0.0,
+    confidence: float = 0.95,
+    rf_daily: float = 0.0,
+) -> float:
+    """Observations needed for the Sharpe to clear ``target_sharpe``.
+
+    The exact inverse of :func:`probabilistic_sharpe_ratio` (Bailey &
+    López de Prado, 2012). PSR asks *"given N observations, how likely is
+    the true Sharpe above the target?"*; MinTRL asks the question a
+    track record is actually judged on: *"how long must the record be
+    before that claim is significant?"*::
+
+        MinTRL = 1 + [1 − γ_3·SR + (γ_4/4)·SR²] · (z_α / (SR − SR*))²
+
+    with all Sharpes *daily*, γ_3 = skew and γ_4 = excess kurtosis, so a
+    negatively skewed or fat-tailed record needs a longer history to
+    prove the same edge. By construction ``PSR(target) >= confidence``
+    holds exactly when the sample length reaches MinTRL.
+
+    Args:
+        returns: Daily return series.
+        target_sharpe: Annualised Sharpe the record must beat.
+        confidence: Required confidence level in (0, 1).
+        rf_daily: Daily risk-free rate.
+
+    Returns:
+        Minimum number of observations (bars). ``inf`` when the observed
+        Sharpe does not exceed the target (no sample size can prove it),
+        the series is shorter than 4 bars, or the moment correction is
+        degenerate.
+
+    Raises:
+        ValueError: If ``confidence`` is outside (0, 1).
+    """
+    if not 0.0 < confidence < 1.0:
+        raise ValueError(f"confidence must be in (0, 1), got {confidence}.")
+
+    r = pd.Series(returns).dropna().to_numpy()
+    if len(r) < 4:
+        return math.inf
+
+    sr_daily = _annualised_sharpe(r, rf_daily=rf_daily) / math.sqrt(TRADING_DAYS)
+    target_daily = target_sharpe / math.sqrt(TRADING_DAYS)
+    if sr_daily <= target_daily:
+        return math.inf  # the observed edge does not beat the target at all
+
+    _, _, skew, kurt = _moments(r)
+    correction = 1.0 - skew * sr_daily + (kurt / 4.0) * sr_daily**2
+    if correction <= 0:
+        return math.inf  # degenerate higher-moment correction
+
+    z = _norm_quantile(confidence)
+    return 1.0 + correction * (z / (sr_daily - target_daily)) ** 2
+
+
 def deflated_sharpe_ratio(
     returns: pd.Series,
     n_trials: int,
