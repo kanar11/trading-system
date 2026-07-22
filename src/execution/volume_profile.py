@@ -48,7 +48,10 @@ def intraday_volume_profile(
         raise ValueError(f"shape must be 'u' or 'flat', got {shape!r}.")
 
     if shape == "flat" or n_buckets == 1:
-        return np.full(n_buckets, 1.0 / n_buckets)
+        # bind to a typed local: numpy stubs otherwise infer Any here on the
+        # py3.11 toolchain -> mypy [no-any-return]
+        uniform: np.ndarray = np.full(n_buckets, 1.0 / n_buckets)
+        return uniform
 
     if not 0.0 < depth <= 1.0:
         raise ValueError(f"depth must be in (0, 1], got {depth}.")
@@ -56,4 +59,5 @@ def intraday_volume_profile(
     # x in [0, 1]; a floored parabola: 1 at the ends, `depth` at the middle
     x = np.linspace(0.0, 1.0, n_buckets)
     raw = depth + (1.0 - depth) * 4.0 * (x - 0.5) ** 2
-    return raw / raw.sum()
+    weights: np.ndarray = raw / raw.sum()
+    return weights
