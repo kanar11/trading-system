@@ -223,3 +223,80 @@ def stoch_rsi(
     k = raw.rolling(smooth_k, min_periods=smooth_k).mean()
     d = k.rolling(smooth_d, min_periods=smooth_d).mean()
     return pd.DataFrame({"stoch_rsi": raw, "k": k, "d": d})
+
+
+def _up_down_streak(close: pd.Series) -> pd.Series:
+    """Signed consecutive up/down run length (Connors' streak series).
+
+    +n after n consecutive up-closes, −n after n down-closes, 0 on a flat
+    close; the run resets to ±1 whenever the direction flips.
+    """
+    direction = np.sign(close.diff().to_numpy())  # NaN on the first bar
+    streak = np.zeros(len(close))
+    run = 0.0
+    for i in range(1, len(close)):
+        d = direction[i]
+        if np.isnan(d) or d == 0.0:
+            run = 0.0
+        elif (d > 0 and run > 0) or (d < 0 and run < 0):
+            run += d
+        else:
+            run = d
+        streak[i] = run
+    return pd.Series(streak, index=close.index)
+
+
+def connors_rsi(
+    close: pd.Series,
+    rsi_period: int = 3,
+    streak_period: int = 2,
+    rank_lookback: int = 100,
+) -> pd.Series:
+    """Connors RSI — a composite short-term momentum oscillator.
+
+    The average of three components, each in [0, 100] (Connors & Alvarez):
+
+    * ``RSI(close, rsi_period)`` — the price RSI (default period 3);
+    * ``RSI(streak, streak_period)`` — RSI of the signed up/down streak,
+      capturing how overextended a consecutive run is;
+    * ``PercentRank`` — the percentile of today's 1-bar return within the
+      trailing ``rank_lookback`` returns.
+
+    Being an average of three responsive pieces, it swings between
+    extremes far faster than a plain RSI — the classic mean-reversion
+    read is oversold below ~10 and overbought above ~90.
+
+    Args:
+        close: Close-price series.
+        rsi_period: Price-RSI lookback (>= 2).
+        streak_period: Streak-RSI lookback (>= 2).
+        rank_lookback: Window for the return percent-rank (>= 2).
+
+    Returns:
+        Series named ``"connors_rsi"`` in [0, 100] (NaN during warm-up).
+
+    Raises:
+        ValueError: If any period is out of range.
+    """
+    if rsi_period < 2 or streak_period < 2:
+        raise ValueError("rsi_period and streak_period must be >= 2.")
+    if rank_lookback < 2:
+        raise ValueError(f"rank_lookback must be >= 2, got {rank_lookback}.")
+
+    price_rsi = rsi(close, period=rsi_period)
+    streak_rsi = rsi(_up_down_streak(close), period=streak_period)
+
+    roc1 = close.pct_change()
+
+    def _percent_rank(window: np.ndarray) -> float:
+        # percentile of the last value among the preceding ones
+        current = window[-1]
+        past = window[:-1]
+        return float((past < current).mean() * 100.0)
+
+    percent_rank = roc1.rolling(rank_lookback + 1, min_periods=rank_lookback + 1).apply(
+        _percent_rank, raw=True
+    )
+
+    crsi = (price_rsi + streak_rsi + percent_rank) / 3.0
+    return crsi.rename("connors_rsi")

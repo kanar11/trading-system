@@ -20,6 +20,7 @@ pandas. Functions are pure (no in-place mutation of inputs).
 from src.indicators.momentum import (
     cci,
     cmo,
+    connors_rsi,
     distance_from_high,
     elder_ray,
     lookback_return,
@@ -91,6 +92,7 @@ __all__ = [
     "chaikin_volatility",
     "choppiness",
     "stoch_rsi",
+    "connors_rsi",
     # volume
     "obv",
     "vwap",
