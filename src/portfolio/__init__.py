@@ -7,6 +7,7 @@ from src.portfolio.analytics import (
     risk_contributions,
 )
 from src.portfolio.black_litterman import BlackLittermanResult, black_litterman
+from src.portfolio.drift import drift_weights
 from src.portfolio.ewma_cov import ewma_covariance
 from src.portfolio.frontier import EfficientFrontier, efficient_frontier
 from src.portfolio.optimizer import (
@@ -48,4 +49,5 @@ __all__ = [
     "constrain_turnover",
     "risk_budget_weights",
     "ewma_covariance",
+    "drift_weights",
 ]
