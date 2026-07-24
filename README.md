@@ -265,10 +265,10 @@ from src.strategy.breakout import breakout_strategy
 
 signals = breakout_strategy(
     df,
-    entry_window=20,    # N-day high/low for entry
-    exit_window=10,     # M-day opposite channel for exit
+    entry_window=20,  # N-day high/low for entry
+    exit_window=10,  # M-day opposite channel for exit
     atr_period=14,
-    atr_filter=0.5,     # require breakout >= 0.5 * ATR
+    atr_filter=0.5,  # require breakout >= 0.5 * ATR
     allow_short=True,
 )
 ```
@@ -342,8 +342,11 @@ Stat-arb on two cointegrated price series. Engle-Granger test fits a hedge ratio
 from src.strategy.pairs import pairs_trading_signal
 
 signals = pairs_trading_signal(
-    coca_cola_close, pepsi_close,
-    z_window=60, z_entry=2.0, z_exit=0.5,
+    coca_cola_close,
+    pepsi_close,
+    z_window=60,
+    z_entry=2.0,
+    z_exit=0.5,
 )
 ```
 
@@ -375,7 +378,7 @@ For a probabilistic, data-driven alternative, `src/regime/hmm.py` fits a univari
 ```python
 from src.regime import HMMConfig, detect_hmm_regime, fit_gaussian_hmm
 
-states = detect_hmm_regime(returns, n_states=2)      # Series of 0/1 regime labels
+states = detect_hmm_regime(returns, n_states=2)  # Series of 0/1 regime labels
 result = fit_gaussian_hmm(returns.to_numpy(), HMMConfig(n_states=3))
 print(result.state_means, result.transition, result.log_likelihood)
 ```
@@ -390,8 +393,8 @@ The scaled forward-backward pass keeps the likelihood numerically stable on long
 from src.regime import regime_durations, regime_transition_matrix
 
 states = detect_hmm_regime(returns, n_states=2)
-transitions = regime_transition_matrix(states)   # P(next | current)
-dwell = regime_durations(states)                 # mean bars spent in each regime
+transitions = regime_transition_matrix(states)  # P(next | current)
+dwell = regime_durations(states)  # mean bars spent in each regime
 ```
 
 ## Risk management
@@ -402,11 +405,11 @@ Risk controls are applied as a middleware layer between position sizing and retu
 from src.risk.manager import RiskConfig
 
 risk_config = RiskConfig(
-    stop_loss=0.05,        # exit if loss exceeds 5%
-    take_profit=0.10,      # exit if profit reaches 10%
-    trailing_stop=0.03,    # exit if 3% drawdown from peak
-    max_position=1.0,      # cap position size at 100%
-    daily_loss_limit=0.02, # flatten all if daily loss exceeds 2%
+    stop_loss=0.05,  # exit if loss exceeds 5%
+    take_profit=0.10,  # exit if profit reaches 10%
+    trailing_stop=0.03,  # exit if 3% drawdown from peak
+    max_position=1.0,  # cap position size at 100%
+    daily_loss_limit=0.02,  # flatten all if daily loss exceeds 2%
 )
 ```
 
@@ -435,14 +438,16 @@ from src.backtest.event_engine import EventEngine
 from src.strategy.base import SmaCrossoverStrategy
 
 eng = EventEngine(
-    symbol="SPY", initial_cash=100_000,
-    commission_per_share=0.005, commission_min=1.0,
+    symbol="SPY",
+    initial_cash=100_000,
+    commission_per_share=0.005,
+    commission_min=1.0,
     slippage_bps=2.0,
 )
 result = eng.run(ohlcv_df, SmaCrossoverStrategy(fast=20, slow=50, trade_qty=100))
 
-print(result.portfolio.cash)                # remaining cash
-print(result.portfolio.positions["SPY"])    # cost basis + realized PnL
+print(result.portfolio.cash)  # remaining cash
+print(result.portfolio.positions["SPY"])  # cost basis + realized PnL
 print(result.equity_curve.tail())
 print(result.fills.head())
 ```
@@ -467,6 +472,7 @@ from src.strategy.base import Strategy
 from src.oms import Side
 from src.indicators import sma
 
+
 class RsiMeanReversion(Strategy):
     def __init__(self, period=14, oversold=30, qty=10):
         self.period = period
@@ -475,6 +481,7 @@ class RsiMeanReversion(Strategy):
 
     def on_bar(self, ctx):
         from src.indicators import rsi
+
         r = rsi(ctx.history["close"], self.period).iloc[-1]
         pos = ctx.portfolio.get_position(ctx.symbol)
         if r < self.oversold and pos.is_flat:
@@ -493,7 +500,7 @@ from src.oms import Order, Side, OrderType
 
 bk = PaperBroker(initial_cash=100_000, commission_per_share=0.005)
 bk.submit_order(Order(symbol="SPY", side=Side.BUY, quantity=100), mark_price=412.50)
-bk.poll({"SPY": 415.10})        # re-evaluate working LIMIT/STOP orders
+bk.poll({"SPY": 415.10})  # re-evaluate working LIMIT/STOP orders
 print(bk.equity({"SPY": 415.10}))
 ```
 
@@ -596,7 +603,7 @@ from src.validation import probability_of_backtest_overfitting
 
 # returns_matrix: (T observations, N candidate configs)
 result = probability_of_backtest_overfitting(returns_matrix, n_blocks=10)
-print(result.pbo)   # ~0 generalises · ~0.5 no real edge · ~1 systematic overfit
+print(result.pbo)  # ~0 generalises · ~0.5 no real edge · ~1 systematic overfit
 ```
 
 The series is split into `n_blocks` equal blocks; every choice of half the blocks as in-sample (with the complement out-of-sample) is evaluated. For each split the in-sample-best config's out-of-sample rank is mapped to a logit, and PBO is the fraction of splits where it lands in the bottom half. Pure numpy.
@@ -659,8 +666,8 @@ Risk diagnostics for a given weight vector + covariance live in `src/portfolio/a
 ```python
 from src.portfolio import diversification_ratio, effective_number_of_assets, risk_contributions
 
-rc = risk_contributions(weights, cov)        # each asset's share of portfolio variance (sums to 1)
-dr = diversification_ratio(weights, cov)     # >= 1; higher = better diversified
+rc = risk_contributions(weights, cov)  # each asset's share of portfolio variance (sums to 1)
+dr = diversification_ratio(weights, cov)  # >= 1; higher = better diversified
 n_eff = effective_number_of_assets(weights)  # inverse-Herfindahl "number of bets"
 ```
 
@@ -669,10 +676,12 @@ from src.portfolio import PortfolioConfig, run_portfolio_backtest
 
 basket = {"SPY": spy_df, "QQQ": qqq_df, "GLD": gld_df}
 result = run_portfolio_backtest(
-    basket, strategy_fn, backtest_fn,
+    basket,
+    strategy_fn,
+    backtest_fn,
     config=PortfolioConfig(weighting="inverse_vol", vol_window=20),
 )
-print(result.metrics)        # portfolio-level Sharpe / MaxDD / etc.
+print(result.metrics)  # portfolio-level Sharpe / MaxDD / etc.
 print(result.per_asset_metrics)  # one dict per ticker
 ```
 
@@ -700,8 +709,8 @@ The same module exposes benchmark-relative **capture ratios**:
 ```python
 from src.reporting.attribution import capture_ratio, down_capture, up_capture
 
-up = up_capture(strategy_returns, benchmark_returns)        # > 1 amplifies upside
-down = down_capture(strategy_returns, benchmark_returns)    # < 1 cushions downside
+up = up_capture(strategy_returns, benchmark_returns)  # > 1 amplifies upside
+down = down_capture(strategy_returns, benchmark_returns)  # < 1 cushions downside
 ratio = capture_ratio(strategy_returns, benchmark_returns)  # up / down; higher is better
 ```
 
@@ -730,8 +739,8 @@ Returns a matplotlib `Figure` and writes a PNG. Headless-friendly — safe to ca
 ```python
 from src.reporting.periodic import annual_returns, monthly_returns_table, rolling_metrics
 
-monthly = monthly_returns_table(returns)    # year x month, with an `annual` total column
-yearly = annual_returns(returns)            # one compounded return per calendar year
+monthly = monthly_returns_table(returns)  # year x month, with an `annual` total column
+yearly = annual_returns(returns)  # one compounded return per calendar year
 roll = rolling_metrics(returns, window=63)  # rolling annualised return / volatility / Sharpe
 ```
 
